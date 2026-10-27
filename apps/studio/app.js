@@ -120,6 +120,8 @@ async function select(slug) {
   $('empty').hidden = true;
   $('station').hidden = false;
   renderStationHead(s);
+  // A recording waiting to be sent goes to whichever station is selected.
+  if (!$('rec-review').hidden && !$('rec-send').disabled) $('rec-send').textContent = `Send to ${s.name}`;
   const url = `${ENGINE}/${s.slug}`;
   // Share the public station page, not the raw stream: it works in any browser and previews in WhatsApp.
   const page = `${location.origin}/s/${s.slug}`;
@@ -148,13 +150,13 @@ async function loadTracks() {
       try { await api(`/stations/${current}/media/${t.id}`, { method: 'DELETE' }); } catch (e) { alert(e.message); }
       loadTracks();
     };
-    return el('li', {}, el('span', {}, t.filename), el('span', { className: 'size' }, fmtSize(t.bytes), ' ', del));
+    return el('li', {}, el('span', { title: t.filename }, t.title || t.filename), el('span', { className: 'size' }, fmtSize(t.bytes), ' ', del));
   }));
   // Keep the schedule's track picker in step with the library.
   const pick = $('sched-track');
   const keep = pick.value;
   pick.replaceChildren(el('option', { value: '', textContent: tracks.length ? 'Choose a track…' : 'Upload a track first' }),
-    ...tracks.map((t) => el('option', { value: String(t.id), textContent: t.filename })));
+    ...tracks.map((t) => el('option', { value: String(t.id), textContent: t.title || t.filename })));
   if (tracks.some((t) => String(t.id) === keep)) pick.value = keep;
   loadSchedule();
 }
@@ -421,3 +423,275 @@ $('copy').onclick = async () => {
 
 // Boot: signed in already? Go straight to the stations.
 api('/auth/me').then(({ user }) => showApp(user)).catch(() => { setMode('signup'); showAuth(); });
+
+// ---- record a programme (FR-04) ----
+// Records with the device microphone, lets the user trim the start and end, and
+// sends the original recording plus the cut points; the server trims and converts.
+const rec = { stream: null, recorder: null, chunks: [], mime: '', started: 0, elapsed: 0, timer: null,
+  ctx: null, raf: null, blob: null, buffer: null, peaks: null, duration: 0, player: null };
+// Above this length the waveform is skipped: decoding a long recording can exhaust a cheap phone's memory.
+const MAX_DECODE_S = 20 * 60;
+const fmtT = (s, tenths = false) => {
+  const m = Math.floor(s / 60);
+  const r = s - m * 60;
+  return `${m}:${tenths ? r.toFixed(1).padStart(4, '0') : String(Math.floor(r)).padStart(2, '0')}`;
+};
+const recView = (v) => ['idle', 'live', 'review'].forEach((n) => { $(`rec-${n}`).hidden = n !== v; });
+const recNote = (msg) => { $('rec-unsupported').textContent = msg; $('rec-unsupported').hidden = !msg; };
+const warnUnsent = (e) => { e.preventDefault(); e.returnValue = ''; };
+
+function recSupportProblem() {
+  if (!window.isSecureContext) return 'Recording needs a secure page (https:// or localhost). It will work on phones once VoxGarden runs on HTTPS.';
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) return 'This browser cannot record audio. Try Chrome or Safari.';
+  return null;
+}
+{
+  const problem = recSupportProblem();
+  if (problem) { recNote(problem); $('rec-start').disabled = true; }
+}
+
+const recSeconds = () => rec.elapsed + (rec.recorder?.state === 'recording' ? (performance.now() - rec.started) / 1000 : 0);
+const updateClock = () => { $('rec-clock').textContent = fmtT(recSeconds()); };
+
+$('rec-start').onclick = async () => {
+  recNote('');
+  try {
+    rec.stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  } catch (e) {
+    recNote(e.name === 'NotAllowedError'
+      ? 'Microphone access was blocked. Allow it from the icon next to the address bar, then try again.'
+      : 'No microphone was found on this device.');
+    return;
+  }
+  // Opus in WebM (Chrome, Android), Ogg (Firefox), AAC in MP4 (Safari, iPhone): all small enough for mobile data.
+  rec.mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].find((m) => MediaRecorder.isTypeSupported(m)) || '';
+  rec.recorder = new MediaRecorder(rec.stream, rec.mime ? { mimeType: rec.mime, audioBitsPerSecond: 48000 } : undefined);
+  rec.chunks = [];
+  rec.recorder.ondataavailable = (e) => { if (e.data.size) rec.chunks.push(e.data); };
+  rec.recorder.onstop = finishRecording;
+  rec.recorder.start(1000);
+  rec.elapsed = 0;
+  rec.started = performance.now();
+
+  // Level meter, so people can see the mic is picking them up.
+  rec.ctx = new AudioContext();
+  const analyser = rec.ctx.createAnalyser();
+  analyser.fftSize = 512;
+  rec.ctx.createMediaStreamSource(rec.stream).connect(analyser);
+  const data = new Uint8Array(analyser.fftSize);
+  const draw = () => {
+    analyser.getByteTimeDomainData(data);
+    let peak = 0;
+    for (const v of data) peak = Math.max(peak, Math.abs(v - 128));
+    $('rec-level').style.width = `${Math.min(100, (peak / 128) * 140)}%`;
+    rec.raf = requestAnimationFrame(draw);
+  };
+  draw();
+  rec.timer = setInterval(updateClock, 250);
+  updateClock();
+  $('rec-card').classList.remove('paused');
+  $('rec-pause').textContent = 'Pause';
+  $('rec-state').textContent = 'Recording';
+  recView('live');
+  window.addEventListener('beforeunload', warnUnsent);
+};
+
+$('rec-pause').onclick = () => {
+  if (rec.recorder.state === 'recording') {
+    rec.elapsed = recSeconds();
+    rec.recorder.pause();
+    $('rec-pause').textContent = 'Resume';
+    $('rec-state').textContent = 'Paused';
+    $('rec-card').classList.add('paused');
+  } else {
+    rec.started = performance.now();
+    rec.recorder.resume();
+    $('rec-pause').textContent = 'Pause';
+    $('rec-state').textContent = 'Recording';
+    $('rec-card').classList.remove('paused');
+  }
+};
+
+$('rec-stop').onclick = () => {
+  rec.elapsed = recSeconds();
+  rec.recorder.stop();
+};
+
+function releaseMic() {
+  clearInterval(rec.timer);
+  cancelAnimationFrame(rec.raf);
+  rec.stream?.getTracks().forEach((t) => t.stop());
+  rec.ctx?.close();
+  rec.ctx = null;
+}
+
+async function finishRecording() {
+  releaseMic();
+  rec.blob = new Blob(rec.chunks, { type: rec.recorder.mimeType || rec.mime || 'audio/webm' });
+  rec.chunks = [];
+  rec.duration = rec.elapsed;
+  rec.buffer = null;
+  rec.peaks = null;
+  if (rec.duration <= MAX_DECODE_S) {
+    try {
+      // Decoded at 16 kHz mono: enough for a waveform and a speech preview, a fraction of the memory.
+      rec.buffer = await new OfflineAudioContext(1, 1, 16000).decodeAudioData(await rec.blob.arrayBuffer());
+      rec.duration = rec.buffer.duration;
+    } catch {
+      // Some browsers can't decode their own recording format: trim still works, just no waveform.
+    }
+  }
+  for (const id of ['rec-in', 'rec-out']) $(id).max = rec.duration.toFixed(1);
+  $('rec-in').value = '0';
+  $('rec-out').value = rec.duration.toFixed(1);
+  $('rec-title').value = '';
+  $('rec-progress').hidden = true;
+  $('rec-err').hidden = true;
+  const st = stations.find((x) => x.slug === current);
+  $('rec-send').textContent = st ? `Send to ${st.name}` : 'Send to station';
+  recView('review');
+  updateTrim();
+}
+
+function computePeaks(width) {
+  const d = rec.buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(d.length / width));
+  const peaks = new Float32Array(width);
+  for (let x = 0; x < width; x++) {
+    let p = 0;
+    for (let i = x * step, e = Math.min(d.length, i + step); i < e; i++) p = Math.max(p, Math.abs(d[i]));
+    peaks[x] = p;
+  }
+  return peaks;
+}
+
+function drawWave() {
+  const c = $('rec-wave');
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.round(c.clientWidth * dpr));
+  const h = Math.round(c.clientHeight * dpr);
+  if (c.width !== w || c.height !== h) { c.width = w; c.height = h; rec.peaks = null; }
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, w, h);
+  const css = getComputedStyle(document.documentElement);
+  if (!rec.buffer) {
+    g.fillStyle = css.getPropertyValue('--muted');
+    g.font = `${13 * dpr}px system-ui`;
+    g.fillText('No waveform for this recording. Use Start and End below.', 10 * dpr, h / 2 + 4 * dpr);
+    return;
+  }
+  if (!rec.peaks) rec.peaks = computePeaks(w);
+  const a = Number($('rec-in').value) / rec.duration;
+  const b = Number($('rec-out').value) / rec.duration;
+  const keep = css.getPropertyValue('--green');
+  const cut = css.getPropertyValue('--line');
+  for (let x = 0; x < w; x++) {
+    const bh = Math.max(dpr, rec.peaks[x] * h * 0.95);
+    g.fillStyle = x / w >= a && x / w <= b ? keep : cut;
+    g.fillRect(x, (h - bh) / 2, 1, bh);
+  }
+}
+
+// Keeps at least half a second between Start and End, whichever one is being dragged.
+function updateTrim(e) {
+  let a = Number($('rec-in').value);
+  let b = Number($('rec-out').value);
+  if (b - a < 0.5) {
+    if (e?.target === $('rec-in')) a = Math.max(0, b - 0.5);
+    else b = Math.min(rec.duration, a + 0.5);
+    $('rec-in').value = a.toFixed(1);
+    $('rec-out').value = b.toFixed(1);
+  }
+  $('rec-start-out').textContent = fmtT(a, true);
+  $('rec-end-out').textContent = fmtT(b, true);
+  $('rec-keep').textContent = fmtT(b - a);
+  drawWave();
+}
+$('rec-in').oninput = updateTrim;
+$('rec-out').oninput = updateTrim;
+window.addEventListener('resize', () => { if (!$('rec-review').hidden) drawWave(); });
+
+function stopPreview() {
+  if (rec.player) { rec.player.stop?.(); rec.player.pause?.(); rec.player = null; }
+  $('rec-play').textContent = '▶ Play kept part';
+}
+
+$('rec-play').onclick = async () => {
+  if (rec.player) return stopPreview();
+  const a = Number($('rec-in').value);
+  const b = Number($('rec-out').value);
+  $('rec-play').textContent = '■ Stop';
+  if (rec.buffer) {
+    const ctx = new AudioContext();
+    const src = ctx.createBufferSource();
+    src.buffer = rec.buffer;
+    src.connect(ctx.destination);
+    src.onended = () => { ctx.close(); if (rec.player === src) stopPreview(); };
+    src.start(0, a, b - a);
+    rec.player = src;
+  } else {
+    const audio = new Audio(URL.createObjectURL(rec.blob));
+    audio.currentTime = a;
+    audio.ontimeupdate = () => { if (audio.currentTime >= b) stopPreview(); };
+    audio.onended = stopPreview;
+    rec.player = audio;
+    audio.play().catch(stopPreview);
+  }
+};
+
+function resetRecorder() {
+  stopPreview();
+  rec.blob = null;
+  rec.buffer = null;
+  rec.peaks = null;
+  window.removeEventListener('beforeunload', warnUnsent);
+  recView('idle');
+}
+
+$('rec-discard').onclick = () => {
+  if (confirm('Discard this recording? It cannot be recovered.')) resetRecorder();
+};
+
+$('rec-send').onclick = () => {
+  const title = $('rec-title').value.trim();
+  const err = $('rec-err');
+  err.hidden = true;
+  if (!title) { err.textContent = 'Give the recording a title.'; err.hidden = false; $('rec-title').focus(); return; }
+  stopPreview();
+  const slug = current;
+  const q = new URLSearchParams({ title, start: $('rec-in').value, end: $('rec-out').value });
+  // XMLHttpRequest rather than fetch: it reports upload progress, which matters on slow mobile data.
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `/stations/${slug}/recordings?${q}`);
+  xhr.setRequestHeader('x-vg-request', '1');
+  const bar = $('rec-progress');
+  bar.hidden = false;
+  bar.firstElementChild.style.width = '0%';
+  $('rec-send').disabled = true;
+  $('rec-send').textContent = 'Uploading…';
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    bar.firstElementChild.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+    if (e.loaded === e.total) $('rec-send').textContent = 'Preparing audio…';
+  };
+  const done = (msg) => {
+    $('rec-send').disabled = false;
+    const st = stations.find((x) => x.slug === slug);
+    $('rec-send').textContent = st ? `Send to ${st.name}` : 'Send to station';
+    if (msg) { err.textContent = msg; err.hidden = false; bar.hidden = true; }
+  };
+  xhr.onload = () => {
+    let body = {};
+    try { body = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+    if (xhr.status === 401) return showAuth();
+    if (xhr.status !== 201) return done(body.error || `Upload failed (${xhr.status})`);
+    done();
+    resetRecorder();
+    recNote(`"${body.title}" is in your library. Schedule it below.`);
+    if (slug === current) loadTracks();
+  };
+  xhr.onerror = () => done('Upload failed: check your connection and press Send again. Your recording is still here.');
+  xhr.send(rec.blob);
+};

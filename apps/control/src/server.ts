@@ -6,7 +6,7 @@ import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { type EngineStation, ensureRunning, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
+import { type EngineStation, convertRecording, ensureRunning, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
 import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
@@ -68,6 +68,11 @@ for (const [col, def] of [
   if (!stationCols.has(col)) db.exec(`ALTER TABLE stations ADD COLUMN ${col} ${def}`);
 }
 
+// Recordings carry a title (FR-04); uploaded files show their filename instead.
+if (!(db.prepare('PRAGMA table_info(media)').all() as { name: string }[]).some((c) => c.name === 'title')) {
+  db.exec("ALTER TABLE media ADD COLUMN title TEXT NOT NULL DEFAULT ''");
+}
+
 // Give stations created before live input existed their own live-input secret.
 for (const r of db.prepare("SELECT id FROM stations WHERE harbor_password = ''").all() as { id: number }[]) {
   db.prepare('UPDATE stations SET harbor_password = ? WHERE id = ?').run(randomBytes(18).toString('base64url'), r.id);
@@ -125,6 +130,18 @@ function validateDetails(input: Record<string, unknown>, partial: boolean): { er
     ?? pick('language', LANGUAGES, 'language') ?? text('country', 60, 'Country') ?? text('city', 60, 'City');
   return err ? { error: err } : { values: out };
 }
+
+// What a phone recording really is, judged by its first bytes (not the name it was sent with).
+function audioType(b: Buffer): 'webm' | 'ogg' | 'm4a' | 'wav' | 'mp3' | null {
+  if (b.length < 12) return null;
+  if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'webm'; // Chrome, Android
+  if (b.toString('ascii', 0, 4) === 'OggS') return 'ogg'; // Firefox
+  if (b.toString('ascii', 4, 8) === 'ftyp') return 'm4a'; // Safari, iPhone
+  if (b.toString('ascii', 0, 4) === 'RIFF' && b.toString('ascii', 8, 12) === 'WAVE') return 'wav';
+  if (b.toString('ascii', 0, 3) === 'ID3' || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0)) return 'mp3';
+  return null;
+}
+const MAX_RECORDING_S = 3 * 3600;
 
 // Only real PNG, JPEG or WebP images are accepted as logos (checked by content, not name).
 function imageType(b: Buffer): 'png' | 'jpg' | 'webp' | null {
@@ -389,6 +406,38 @@ const server = createServer(async (req, res) => {
       return send(res, 200, presentStation({ ...getStation(st.id), role: st.role }));
     }
 
+    // POST /stations/:slug/recordings?title=&start=&end=   (raw recording body, any member)
+    // Trims to [start, end] seconds, converts to MP3 and adds it to the library.
+    if (req.method === 'POST' && parts[0] === 'stations' && parts[2] === 'recordings' && parts.length === 3) {
+      const st = stationFor(user, parts[1]);
+      if (!st) return send(res, 404, { error: 'No such station' });
+      const title = (url.searchParams.get('title') ?? '').trim();
+      const start = Number(url.searchParams.get('start'));
+      const end = Number(url.searchParams.get('end'));
+      if (!title || title.length > 80) return send(res, 400, { error: 'Give the recording a title (max 80 characters)' });
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end - start < 0.5) return send(res, 400, { error: 'The kept part must be at least half a second long' });
+      if (end - start > MAX_RECORDING_S) return send(res, 400, { error: 'Recordings can be up to 3 hours' });
+      const body = await readBody(req, MAX_UPLOAD);
+      const ext = audioType(body);
+      if (!ext) return send(res, 400, { error: 'That does not look like an audio recording' });
+      // Under data/ (not the system temp folder) so Docker Desktop on Mac can mount it.
+      const work = mkdtempSync(join(DATA_DIR, 'tmp-rec-'));
+      try {
+        writeFileSync(join(work, `in.${ext}`), body);
+        const out = await convertRecording(work, ext, start, end);
+        const base = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50) || 'recording';
+        const saved = importTrack(st.slug, out, `${base}-${new Date().toISOString().slice(0, 10)}.mp3`);
+        const bytes = readFileSync(join(mediaDir(st.slug), saved)).length;
+        const r = db.prepare('INSERT INTO media (station_id, filename, bytes, title) VALUES (?, ?, ?, ?)').run(st.id, saved, bytes, title);
+        await ensureRunning(engineStation(st.id));
+        return send(res, 201, { id: Number(r.lastInsertRowid), filename: saved, title, bytes, seconds: Math.round((end - start) * 10) / 10 });
+      } catch (e) {
+        return send(res, 422, { error: (e as Error).message });
+      } finally {
+        rmSync(work, { recursive: true, force: true });
+      }
+    }
+
     if (parts[0] === 'stations' && parts[2] === 'media') {
       const st = stationFor(user, parts[1] ?? '');
       if (!st) return send(res, 404, { error: 'No such station' });
@@ -413,7 +462,7 @@ const server = createServer(async (req, res) => {
 
       // GET /stations/:slug/media
       if (req.method === 'GET' && parts.length === 3) {
-        const rows = db.prepare('SELECT id, filename, bytes, created_at FROM media WHERE station_id = ? ORDER BY id DESC').all(st.id);
+        const rows = db.prepare('SELECT id, filename, title, bytes, created_at FROM media WHERE station_id = ? ORDER BY id DESC').all(st.id);
         return send(res, 200, rows);
       }
 

@@ -3,7 +3,7 @@
 // crashing one station never touches another station's listeners.
 // Icecast is shared (engine/docker-compose.yml); a station only owns its mount.
 import { execFile } from 'node:child_process';
-import { mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import net from 'node:net';
 
@@ -174,6 +174,58 @@ export async function playNow(s: { id: number; slug: string }, filename: string,
   const rid = reply.split('\n').pop() ?? '';
   if (!/^\d+$/.test(rid)) throw new Error(`engine refused: ${reply.slice(0, 80)}`);
   return rid;
+}
+
+// ---- recordings (FR-04): trim and convert with the same Liquidsoap image ----
+// One conversion at a time: Liquidsoap briefly needs ~300 MB while starting.
+let convertQueue: Promise<unknown> = Promise.resolve();
+
+// Cuts [start, end] seconds out of a phone recording and converts it to a 64 kbps
+// mono MP3 (about 29 MB per hour), running unsynced so it takes seconds, not real time.
+// workDir must contain `in.<ext>`; the result is written to workDir/out.mp3.
+//
+// Browser recordings (MediaRecorder WebM/Ogg) have no seek index, so Liquidsoap
+// can't jump to a start point in them ("Initial seek mismatch") and would silently
+// keep the beginning. When the start is trimmed, pass 1 decodes up to `end` into a
+// WAV (no seeking needed), and pass 2 cuts the start from that WAV, which can seek.
+export function convertRecording(workDir: string, ext: string, start: number, end: number): Promise<string> {
+  const job = async () => {
+    if (!/^(webm|ogg|m4a|wav|mp3)$/.test(ext)) throw new Error('unsupported format');
+    const cut = (n: number) => n.toFixed(3); // numbers only: nothing from the user reaches the scripts as text
+    const pass = (input: string, cues: string, output: string, format: string) => `settings.log.stdout := true
+settings.log.level := 2
+s = once(single("annotate:${cues}:/work/${input}"))
+clock.assign_new(sync="none", [s])
+output.file(${format}, "/work/${output}", fallible=true, on_stop=shutdown, s)
+`;
+    const mp3 = '%mp3(mono, bitrate=64)';
+    const trimStart = start >= 0.05;
+    if (trimStart) {
+      writeFileSync(join(workDir, 'pass1.liq'), pass(`in.${ext}`, `liq_cue_out=${cut(end)}`, 'full.wav', '%wav(mono)'));
+      writeFileSync(join(workDir, 'pass2.liq'), pass('full.wav', `liq_cue_in=${cut(start)}`, 'out.mp3', mp3));
+    } else {
+      writeFileSync(join(workDir, 'pass2.liq'), pass(`in.${ext}`, `liq_cue_out=${cut(end)}`, 'out.mp3', mp3));
+    }
+    const steps = trimStart ? 'liquidsoap /work/pass1.liq && liquidsoap /work/pass2.liq' : 'liquidsoap /work/pass2.liq';
+
+    const name = `vg-convert-${Date.now().toString(36)}`;
+    // Run as this user so the output file is ours (and readable on Linux hosts).
+    const user = typeof process.getuid === 'function' ? ['--user', `${process.getuid()}:${process.getgid?.()}`] : [];
+    // Generous limit: a 10-minute recording takes ~10 s per pass.
+    const timer = setTimeout(() => { docker(['rm', '-f', name]); }, 60_000 + (end - start) * 200);
+    try {
+      await docker(['run', '--rm', '--name', name, '--network', 'none', '--memory', MEMORY_LIMIT, ...user,
+        '-e', 'HOME=/tmp', '-v', `${workDir}:/work`, '--entrypoint', 'sh', IMAGE, '-c', steps]);
+    } finally {
+      clearTimeout(timer);
+    }
+    const out = join(workDir, 'out.mp3');
+    if (!existsSync(out) || statSync(out).size < 1000) throw new Error('Could not read that recording. Try recording again.');
+    return out;
+  };
+  const run = convertQueue.then(job, job);
+  convertQueue = run.catch(() => {});
+  return run;
 }
 
 export function importTrack(slug: string, srcPath: string, filename: string): string {

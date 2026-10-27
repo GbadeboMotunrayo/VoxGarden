@@ -20,6 +20,7 @@ API calls need a session cookie (from `/auth/signup` or `/auth/login`) and the h
 - Engine: one Liquidsoap container per station (`vg-station-<slug>`), started on its first upload, restarted alone when its name changes. Icecast is shared.
 - Scheduling (FR-08): `GET/POST /stations/:slug/schedule`, `DELETE /stations/:slug/schedule/:id`. A 250 ms scheduler loop hands due items to the station; late by more than 60 s = missed.
 - Public station page (FR-10): `/s/<web-address>` and `GET /public/stations/<web-address>` (profile + on-air + listeners; no secrets). Set `VG_PUBLIC_BASE` (page links, previews) and `VG_STREAM_BASE` (listener stream host) in production.
+- Recording (FR-04): `POST /stations/:slug/recordings?title=&start=&end=` with the raw browser recording (WebM, Ogg, MP4/AAC, WAV or MP3, judged by content). A one-off Liquidsoap container trims and converts it to 64 kbps mono MP3. Browser WebM has no seek index, so trimming the start uses two passes (decode to WAV, then cut).
 - Create station, upload/remove audio, AutoDJ playlist streams over Icecast at 64 kbps MP3.
 
 ## Known gaps (next)

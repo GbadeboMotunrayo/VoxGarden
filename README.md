@@ -6,7 +6,7 @@ VoxGarden lets anyone start an internet radio station from a phone or a laptop, 
 
 Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifting others.*
 
-> Status: **building MVP-0, testing locally.** Built so far: accounts, station wizard, uploads, per-station engine, scheduling, public station page. Not yet: phone recording, usage metering, Go Live button. Details in [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md).
+> Status: **building MVP-0, testing locally.** Built so far: accounts, station wizard, uploads, recording with trim, per-station engine, scheduling, public station page. Not yet: usage metering, Go Live button, HTTPS (needed for recording on phones). Details in [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md).
 
 ## Run it on your computer
 
@@ -24,7 +24,8 @@ Then try the whole flow:
 1. **Create an account**, then **Plant your first station** (4 short steps).
 2. **Upload an audio file** to the Library. The station starts broadcasting within a few seconds.
 3. Click **Public page ↗**: that's what listeners see. Press play.
-4. In **Schedule**, pick the track and a time a minute or two ahead. Watch it move to *Played on time*.
+4. In **Record a programme**, record a few seconds (allow the microphone), drag Start/End to trim, add a title and **Send**.
+5. In **Schedule**, pick the track and a time a minute or two ahead. Watch it move to *Played on time*.
 
 Stop everything with `Ctrl+C`, then `npm run stop`. Your accounts, stations and audio stay in `data/` and `engine/media/` (both git-ignored), and come back on the next `npm start`.
 

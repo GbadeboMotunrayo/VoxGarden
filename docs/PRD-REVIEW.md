@@ -85,10 +85,10 @@ These need numbers before engineering can test against them:
 | FR-01 Accounts | **Built** (27 Oct) | Sign up, log in, log out, station ownership. No password reset or email verification yet. |
 | FR-02 Station wizard | **Built** (27 Oct) | 4 steps: name and web address, description/category/language, country/city, logo. Same wizard edits a station (owners only; web address is permanent). |
 | FR-03 Provisioning | **Built** (27 Oct) | One Liquidsoap process per station, started on first upload. Adding or changing a station no longer affects anyone else's listeners (tested). |
-| FR-04 Record on phone | Not built | |
+| FR-04 Record on phone | **Built** (27 Oct) | Record / pause / resume / stop with level meter, waveform, trim start and end, preview the kept part, title, send with upload progress. Server trims and converts to 64 kbps mono MP3 using the engine image (no extra installs). Tested with a generated tone in desktop Chromium; **real phones need HTTPS** (browser rule), so not yet tested on a phone. |
 | FR-05 Editing | Not built | |
 | FR-06 Upload/organise | Partial | Upload and remove work. No organising, no validation of file contents. |
-| FR-07 Create → Studio | Not built | |
+| FR-07 Create → Studio | **Built** (27 Oct) | A recording lands in the station library under its title, ready to schedule. No local drafts yet: an unsent recording is lost if the page closes (the page warns first). |
 | FR-08 Scheduling | **Built** (27 Oct) | Pick a library track and a time; it starts on time (12-293 ms after the slot in tests), cuts off any earlier scheduled item, then AutoDJ resumes. Cancel, missed (>60 s late) and failed states. Single plays only: no recurring shows or playlists-in-a-slot yet. |
 | FR-09 Live | Not built | |
 | FR-10 Public player | **Built** (27 Oct) | `/s/<station>`: no login, logo, details, live/off-air status, listener count, play/pause that stops data use when paused, auto-reconnect, lock-screen controls, data-use note, WhatsApp/share/copy, link previews (title, description, logo). |

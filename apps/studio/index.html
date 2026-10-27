@@ -81,6 +81,50 @@
         <p class="hint">A new track can take a few seconds to join the rotation. If the player is silent, press play again.</p>
       </div>
 
+      <div class="card rec" id="rec-card">
+        <h3>Record a programme</h3>
+        <p id="rec-unsupported" class="muted small" hidden></p>
+
+        <div id="rec-idle">
+          <button id="rec-start" class="rec-btn" type="button" aria-label="Start recording"><span class="dot"></span></button>
+          <p class="muted small">Tap to record with this device's microphone. A quiet room helps more than an expensive mic.</p>
+        </div>
+
+        <div id="rec-live" hidden>
+          <p class="rec-time"><span class="rec-dot" aria-hidden="true"></span><span id="rec-clock">0:00</span> <span id="rec-state" class="muted small">Recording</span></p>
+          <div class="meter" aria-hidden="true"><div id="rec-level"></div></div>
+          <div class="row center">
+            <button id="rec-pause" class="btn" type="button">Pause</button>
+            <button id="rec-stop" class="btn primary auto" type="button">Stop</button>
+          </div>
+        </div>
+
+        <div id="rec-review" hidden>
+          <canvas id="rec-wave" class="wave" height="80" aria-hidden="true"></canvas>
+          <div class="trim">
+            <label>Start <output id="rec-start-out">0:00.0</output>
+              <input id="rec-in" type="range" min="0" step="0.1" value="0">
+            </label>
+            <label>End <output id="rec-end-out">0:00.0</output>
+              <input id="rec-out" type="range" min="0" step="0.1" value="0">
+            </label>
+          </div>
+          <p class="muted small">Keeping <strong id="rec-keep">0:00</strong>. Drag Start and End to cut silence or mistakes.</p>
+          <div class="row">
+            <button id="rec-play" class="btn" type="button">▶ Play kept part</button>
+          </div>
+          <label class="field">Title
+            <input id="rec-title" maxlength="80" placeholder="e.g. Morning news, 27 October">
+          </label>
+          <div class="progress" id="rec-progress" hidden><div></div></div>
+          <p id="rec-err" class="err" role="alert" hidden></p>
+          <div class="row">
+            <button id="rec-send" class="btn primary auto" type="button">Send to station</button>
+            <button id="rec-discard" class="btn danger" type="button">Discard</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <h3>Library <span id="count" class="muted"></span></h3>
         <label id="drop" class="drop" tabindex="0">

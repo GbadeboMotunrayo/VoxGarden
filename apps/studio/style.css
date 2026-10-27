@@ -110,6 +110,29 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .review dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
 .review dt { color: var(--muted); }
 .review dd { margin: 0; overflow-wrap: anywhere; }
+/* record (FR-04) */
+.rec #rec-idle { text-align: center; }
+.rec-btn { width: 84px; height: 84px; border-radius: 50%; border: 4px solid var(--line); background: var(--surface); cursor: pointer; display: grid; place-items: center; margin: 4px auto 8px; }
+.rec-btn .dot { width: 46px; height: 46px; border-radius: 50%; background: #dc2626; }
+.rec-btn:hover { border-color: #dc2626; }
+.rec-time { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; margin: 4px 0; }
+.rec-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #dc2626; margin-right: 10px; vertical-align: 4px; animation: blink 1s steps(2) infinite; }
+.paused .rec-dot { animation: none; opacity: .3; }
+@keyframes blink { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
+.meter { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 10px 0 14px; }
+.meter div { height: 100%; width: 0; background: var(--green); transition: width .08s linear; }
+.row.center { justify-content: center; }
+.row { flex-wrap: wrap; margin: 10px 0; }
+.wave { width: 100%; height: 80px; display: block; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); }
+.trim { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+.trim label, .rec .field { font-size: .85rem; color: var(--muted); display: block; }
+.trim output { color: var(--ink); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.trim input { width: 100%; accent-color: var(--green); }
+.rec .field input { width: 100%; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 12px; }
+.progress div { height: 100%; width: 0; background: var(--green); }
+
 /* schedule */
 .sched-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
 @media (max-width: 640px) { .sched-form { grid-template-columns: 1fr; } }
