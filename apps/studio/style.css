@@ -53,6 +53,16 @@ input:focus-visible, button:focus-visible, .drop:focus-visible { outline: 3px so
 .btn.small { padding: 4px 10px; font-size: .85rem; font-weight: 500; }
 .btn.danger { color: var(--danger); }
 .btn:disabled { opacity: .6; cursor: progress; }
+.top-right { display: flex; align-items: center; gap: 12px; font-size: .85rem; }
+.auth { display: grid; place-items: center; padding: 48px 16px; }
+.auth-card { width: 100%; max-width: 400px; padding: 24px; }
+.auth-card h1 { margin-bottom: 4px; }
+.auth-card form { margin-top: 18px; }
+.auth-card label { display: block; font-size: .85rem; color: var(--muted); margin-bottom: 12px; }
+.auth-card input { width: 100%; margin-top: 4px; padding: 10px 12px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+.switch { font-size: .9rem; color: var(--muted); margin: 14px 0 0; }
+.linkish { background: none; border: 0; padding: 0; color: var(--green); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }
 .err { color: var(--danger); font-size: .9rem; margin: 0 0 10px; }
 
 .empty { padding: 60px 8px; max-width: 520px; }

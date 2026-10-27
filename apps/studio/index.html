@@ -9,10 +9,36 @@
 <body>
 <header class="top">
   <div class="brand"><span class="mark" aria-hidden="true"></span><span>VoxGarden <b>Studio</b></span></div>
-  <div id="conn" class="conn" role="status">Connecting…</div>
+  <div class="top-right">
+    <div id="conn" class="conn" role="status">Connecting…</div>
+    <span id="who" class="muted" hidden></span>
+    <button id="logout" class="btn small" type="button" hidden>Log out</button>
+  </div>
 </header>
 
-<main class="layout">
+<main id="auth" class="auth" hidden>
+  <div class="card auth-card">
+    <h1 id="auth-title">Start your station</h1>
+    <p class="muted" id="auth-sub">Create a free account. No technical setup.</p>
+    <form id="auth-form" autocomplete="on">
+      <label id="f-name">Your name
+        <input id="a-name" name="name" maxlength="80" autocomplete="name">
+      </label>
+      <label>Email
+        <input id="a-email" name="email" type="email" required autocomplete="email">
+      </label>
+      <label>Password
+        <input id="a-pass" name="password" type="password" required minlength="10" autocomplete="new-password">
+        <small class="muted" id="pass-hint">At least 10 characters.</small>
+      </label>
+      <p id="a-err" class="err" role="alert" hidden></p>
+      <button class="btn primary" type="submit" id="auth-submit">Create account</button>
+    </form>
+    <p class="switch"><span id="switch-text">Already have an account?</span> <button type="button" class="linkish" id="auth-switch">Log in</button></p>
+  </div>
+</main>
+
+<main class="layout" id="app" hidden>
   <aside class="side" aria-label="Your stations">
     <div class="side-head">
       <h2>Your stations</h2>

@@ -4,12 +4,80 @@ const ENGINE = `${location.protocol}//${location.hostname}:8000`; // Icecast
 let stations = [];
 let current = null;
 
-async function api(path, opts) {
-  const res = await fetch(path, opts);
+// Every request carries x-vg-request (the server's CSRF check). A 401 means the
+// session is gone, so we fall back to the sign-in screen.
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'x-vg-request': '1', ...(opts.headers || {}) } });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && !path.startsWith('/auth/')) showAuth();
   if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
   return body;
 }
+
+// ---- sign up / log in ----
+let mode = 'signup';
+function setMode(m) {
+  mode = m;
+  const signup = m === 'signup';
+  $('auth-title').textContent = signup ? 'Start your station' : 'Welcome back';
+  $('auth-sub').textContent = signup ? 'Create a free account. No technical setup.' : 'Log in to manage your stations.';
+  $('f-name').hidden = !signup;
+  $('a-name').required = signup;
+  $('pass-hint').hidden = !signup;
+  $('a-pass').autocomplete = signup ? 'new-password' : 'current-password';
+  $('auth-submit').textContent = signup ? 'Create account' : 'Log in';
+  $('switch-text').textContent = signup ? 'Already have an account?' : 'New to VoxGarden?';
+  $('auth-switch').textContent = signup ? 'Log in' : 'Create an account';
+  $('a-err').hidden = true;
+}
+$('auth-switch').onclick = () => setMode(mode === 'signup' ? 'login' : 'signup');
+
+function showAuth() {
+  current = null;
+  $('app').hidden = true;
+  $('auth').hidden = false;
+  $('who').hidden = true;
+  $('logout').hidden = true;
+  $('conn').hidden = true;
+}
+
+function showApp(user) {
+  $('auth').hidden = true;
+  $('app').hidden = false;
+  $('who').textContent = user.name;
+  $('who').hidden = false;
+  $('logout').hidden = false;
+  $('conn').hidden = false;
+  loadStations();
+}
+
+$('auth-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const btn = $('auth-submit');
+  btn.disabled = true;
+  $('a-err').hidden = true;
+  try {
+    const payload = { email: $('a-email').value, password: $('a-pass').value };
+    if (mode === 'signup') payload.name = $('a-name').value;
+    const { user } = await api(mode === 'signup' ? '/auth/signup' : '/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+    $('auth-form').reset();
+    showApp(user);
+  } catch (ex) {
+    $('a-err').textContent = ex.message;
+    $('a-err').hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+$('logout').onclick = async () => {
+  await api('/auth/logout', { method: 'POST' }).catch(() => {});
+  $('stations').replaceChildren();
+  $('station').hidden = true;
+  $('audio').pause();
+  setMode('login');
+  showAuth();
+};
 
 const fmtSize = (b) => (b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 
@@ -114,7 +182,9 @@ function upload(file) {
   const row = el('li', {}, el('span', {}, file.name), el('span', { className: 'size' }, 'Uploading…'));
   $('uploads').prepend(row);
   const status = row.lastChild;
-  return fetch(`/stations/${current}/media?filename=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })
+  return fetch(`/stations/${current}/media?filename=${encodeURIComponent(file.name)}`, {
+    method: 'POST', body: file, headers: { 'x-vg-request': '1' },
+  })
     .then(async (r) => {
       const b = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(b.error || 'Upload failed');
@@ -143,4 +213,5 @@ $('copy').onclick = async () => {
   setTimeout(() => { $('copied').hidden = true; }, 1500);
 };
 
-loadStations();
+// Boot: signed in already? Go straight to the stations.
+api('/auth/me').then(({ user }) => showApp(user)).catch(() => { setMode('signup'); showAuth(); });

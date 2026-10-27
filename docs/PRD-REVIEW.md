@@ -82,7 +82,7 @@ These need numbers before engineering can test against them:
 
 | FR | Status | Notes |
 |---|---|---|
-| FR-01 Accounts | **Not built** | API is open. Blocks any real user. |
+| FR-01 Accounts | **Built** (27 Oct) | Sign up, log in, log out, station ownership. No password reset or email verification yet. |
 | FR-02 Station wizard | Partial | Name + web address only. No description, category, language, logo. |
 | FR-03 Provisioning | Partial | Works, but adding a station restarts all stations. |
 | FR-04 Record on phone | Not built | |
@@ -96,7 +96,7 @@ These need numbers before engineering can test against them:
 | FR-12 Health | Not built | |
 | FR-13 Usage metering | Not built | |
 
-NFR security: **fails** (no auth, no server-side permissions). Everything built so far is a technical proof of concept (PRD Phase 1), not MVP work, and should be described that way.
+NFR security: auth and server-side permissions now in place; upload content validation, quotas and rate limits beyond login still missing. Everything built so far is a technical proof of concept (PRD Phase 1), not MVP work, and should be described that way.
 
 ## Proposed order of work once signed off
 
