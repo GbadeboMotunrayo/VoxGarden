@@ -83,7 +83,7 @@ These need numbers before engineering can test against them:
 | FR | Status | Notes |
 |---|---|---|
 | FR-01 Accounts | **Built** (27 Oct) | Sign up, log in, log out, station ownership. No password reset or email verification yet. |
-| FR-02 Station wizard | Partial | Name + web address only. No description, category, language, logo. |
+| FR-02 Station wizard | **Built** (27 Oct) | 4 steps: name and web address, description/category/language, country/city, logo. Same wizard edits a station (owners only; web address is permanent). |
 | FR-03 Provisioning | Partial | Works, but adding a station restarts all stations. |
 | FR-04 Record on phone | Not built | |
 | FR-05 Editing | Not built | |

@@ -44,32 +44,30 @@
       <h2>Your stations</h2>
     </div>
     <ul id="stations" class="station-list"></ul>
-    <form id="new-station" class="card new" autocomplete="off">
-      <h3>Plant a new station</h3>
-      <label>Station name
-        <input id="ns-name" required maxlength="80" placeholder="e.g. Unilag Campus FM">
-      </label>
-      <label>Web address
-        <span class="slug-row"><span class="pre">…/</span><input id="ns-slug" required maxlength="40" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="unilag-campus-fm"></span>
-      </label>
-      <p id="ns-err" class="err" role="alert" hidden></p>
-      <button class="btn primary" type="submit">Create station</button>
-    </form>
+    <button id="new-station" class="btn primary" type="button">+ New station</button>
   </aside>
 
   <section class="main" id="main" aria-live="polite">
     <div id="empty" class="empty">
       <h1>Every voice deserves room to grow.</h1>
-      <p>Create your first station on the left. Name it, upload a few tracks, and it starts broadcasting.</p>
+      <p>Set up your first station in four short steps: name it, describe it, say where it's from, and add a logo.</p>
+      <button id="empty-new" class="btn primary auto" type="button">Plant your first station</button>
     </div>
 
     <div id="station" hidden>
       <div class="station-head">
-        <div>
+        <img id="st-logo" class="logo" alt="" hidden>
+        <div id="st-logo-ph" class="logo ph" aria-hidden="true"></div>
+        <div class="grow">
           <h1 id="st-name"></h1>
-          <p class="muted" id="st-url"></p>
+          <p class="chips" id="st-chips"></p>
+          <p id="st-desc" class="desc"></p>
+          <p class="muted small" id="st-url"></p>
         </div>
-        <span id="st-badge" class="badge">On air</span>
+        <div class="head-actions">
+          <span id="st-badge" class="badge">On air</span>
+          <button id="edit-station" class="btn small" type="button">Edit details</button>
+        </div>
       </div>
 
       <div class="card player">
@@ -96,6 +94,73 @@
     </div>
   </section>
 </main>
+
+<dialog id="wizard" aria-labelledby="wz-title">
+  <form id="wz-form" method="dialog" autocomplete="off" novalidate>
+    <div class="wz-head">
+      <p class="muted small" id="wz-step-label">Step 1 of 4</p>
+      <h2 id="wz-title" class="wz-title">Name your station</h2>
+      <ol class="wz-dots" aria-hidden="true"><li></li><li></li><li></li><li></li></ol>
+    </div>
+
+    <fieldset data-step="1">
+      <legend class="sr">Name</legend>
+      <label>Station name
+        <input id="wz-name" maxlength="80" placeholder="e.g. Unilag Campus FM">
+      </label>
+      <label id="wz-slug-wrap">Web address
+        <span class="slug-row"><span class="pre">…/</span><input id="wz-slug" maxlength="40" placeholder="unilag-campus-fm" spellcheck="false"></span>
+        <small class="muted">Lowercase letters, numbers and hyphens. This can't be changed later.</small>
+      </label>
+    </fieldset>
+
+    <fieldset data-step="2" hidden>
+      <legend class="sr">About</legend>
+      <label>What is your station about?
+        <textarea id="wz-desc" maxlength="500" rows="4" placeholder="News, music and conversations from Akoka campus, run by students."></textarea>
+        <small class="muted"><span id="wz-desc-count">0</span>/500</small>
+      </label>
+      <label>Category
+        <select id="wz-category"><option value="">Choose…</option></select>
+      </label>
+      <label>Main language
+        <select id="wz-language"><option value="">Choose…</option></select>
+      </label>
+    </fieldset>
+
+    <fieldset data-step="3" hidden>
+      <legend class="sr">Location</legend>
+      <p class="muted small">Listeners will find you on the map by place. Optional, but recommended.</p>
+      <label>Country
+        <input id="wz-country" maxlength="60" placeholder="Nigeria" list="countries">
+        <datalist id="countries"><option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>South Africa</option><option>United Kingdom</option><option>United States</option></datalist>
+      </label>
+      <label>City or town
+        <input id="wz-city" maxlength="60" placeholder="Lagos">
+      </label>
+    </fieldset>
+
+    <fieldset data-step="4" hidden>
+      <legend class="sr">Logo</legend>
+      <div class="logo-pick">
+        <img id="wz-logo-preview" class="logo big" alt="Logo preview" hidden>
+        <div id="wz-logo-ph" class="logo big ph" aria-hidden="true"></div>
+        <div>
+          <input id="wz-logo" type="file" accept="image/png,image/jpeg,image/webp" class="sr">
+          <label for="wz-logo" class="btn small" id="wz-logo-btn">Choose image</label>
+          <p class="muted small">Square works best. PNG, JPEG or WebP, up to 2 MB. You can skip this.</p>
+        </div>
+      </div>
+      <div class="review" id="wz-review"></div>
+    </fieldset>
+
+    <p id="wz-err" class="err" role="alert" hidden></p>
+    <div class="wz-actions">
+      <button type="button" class="btn" id="wz-back">Cancel</button>
+      <button type="button" class="btn primary auto" id="wz-next">Next</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="/app.js"></script>
 </body>

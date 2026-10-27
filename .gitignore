@@ -4,3 +4,4 @@ engine/.env
 *.db
 *.db-*
 node_modules/
+data/
