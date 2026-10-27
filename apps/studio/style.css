@@ -52,6 +52,7 @@ input:focus-visible, button:focus-visible, .drop:focus-visible { outline: 3px so
   color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
 .btn.primary { background: var(--green); border-color: var(--green); color: #fff; width: 100%; }
 @media (prefers-color-scheme: dark) { .btn.primary { color: #052e16; } }
+a.btn { text-decoration: none; display: inline-block; text-align: center; }
 .btn.small { padding: 4px 10px; font-size: .85rem; font-weight: 500; }
 .btn.danger { color: var(--danger); }
 .btn:disabled { opacity: .6; cursor: progress; }

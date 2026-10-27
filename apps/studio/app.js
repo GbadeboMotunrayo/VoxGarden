@@ -121,7 +121,10 @@ async function select(slug) {
   $('station').hidden = false;
   renderStationHead(s);
   const url = `${ENGINE}/${s.slug}`;
-  $('st-url').textContent = url;
+  // Share the public station page, not the raw stream: it works in any browser and previews in WhatsApp.
+  const page = `${location.origin}/s/${s.slug}`;
+  $('st-url').textContent = page;
+  $('public-link').href = page;
   if (changed) {
     const a = $('audio');
     a.pause();

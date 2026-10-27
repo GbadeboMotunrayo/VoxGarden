@@ -6,7 +6,7 @@ import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { type EngineStation, ensureRunning, importTrack, listenUrl, mediaDir, playNow, reconcile, removeTrack } from './engine.ts';
+import { type EngineStation, ensureRunning, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
 import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
@@ -19,6 +19,18 @@ const STUDIO_FILES: Record<string, { name: string; type: string }> = {
   '/style.css': { name: 'style.css', type: 'text/css; charset=utf-8' },
 };
 const SECURE_COOKIE = process.env.VG_SECURE_COOKIE === '1'; // set to 1 behind HTTPS
+const PORT = Number(process.env.PORT ?? 4000);
+// Public address of this platform, used in share links and link previews.
+const PUBLIC_BASE = (process.env.VG_PUBLIC_BASE ?? `http://localhost:${PORT}`).replace(/\/$/, '');
+
+// Public station page (FR-10): no login. Fixed file list, like the Studio.
+const PUBLIC_DIR = resolve(import.meta.dirname, '../../public');
+const PUBLIC_FILES: Record<string, { name: string; type: string }> = {
+  '/public/station.js': { name: 'station.js', type: 'text/javascript; charset=utf-8' },
+  '/public/station.css': { name: 'station.css', type: 'text/css; charset=utf-8' },
+  '/public/default-logo.svg': { name: 'default-logo.svg', type: 'image/svg+xml' },
+};
+const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 const db = new DatabaseSync(process.env.VG_DB ?? 'voxgarden.db');
 db.exec('PRAGMA foreign_keys = ON');
@@ -142,6 +154,14 @@ const myStations = (userId: number) => db.prepare(
    JOIN station_members m ON m.station_id = s.id WHERE m.user_id = ? ORDER BY s.id`,
 ).all(userId) as unknown as StationRow[];
 
+// The public view of a station: profile fields only (no owner, no secrets).
+function publicStation(slug: string) {
+  const s = db.prepare(`SELECT ${STATION_FIELDS} FROM stations s WHERE s.slug = ?`).get(slug) as unknown as StationRow | undefined;
+  if (!s) return null;
+  const { role: _r, ...rest } = presentStation(s);
+  return { ...rest, stream: listenUrl(s.slug), page: `${PUBLIC_BASE}/s/${s.slug}` };
+}
+
 const getStation = (id: number) => db.prepare(`SELECT ${STATION_FIELDS} FROM stations s WHERE s.id = ?`).get(id) as unknown as StationRow;
 
 // Returns the station only if this user is a member of it. Non-members get the
@@ -211,6 +231,51 @@ const server = createServer(async (req, res) => {
       });
       return res.end(readFileSync(file));
     }
+    if (req.method === 'GET') {
+      const file = PUBLIC_FILES[url.pathname];
+      if (file) {
+        res.writeHead(200, { 'content-type': file.type, 'cache-control': 'public, max-age=300', 'x-content-type-options': 'nosniff' });
+        return res.end(readFileSync(join(PUBLIC_DIR, file.name)));
+      }
+    }
+
+    // GET /public/stations/:slug  what anyone may know about a station, plus live status
+    if (req.method === 'GET' && parts[0] === 'public' && parts[1] === 'stations' && parts.length === 3) {
+      const st = publicStation(parts[2]);
+      if (!st) return send(res, 404, { error: 'No such station' });
+      const mounts = await mountStatus();
+      return send(res, 200, { ...st, on_air: mounts.has(st.slug), listeners: mounts.get(st.slug) ?? 0 }, { 'cache-control': 'no-store' });
+    }
+
+    // GET /s/:slug  the shareable station page
+    if (req.method === 'GET' && parts[0] === 's' && parts.length === 2) {
+      const st = publicStation(parts[1]);
+      res.setHeader('content-security-policy',
+        `default-src 'self'; img-src 'self' data:; media-src ${streamOrigin()}; connect-src 'self'; ` +
+        "style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
+      if (!st) {
+        res.writeHead(404, { 'content-type': 'text/html; charset=utf-8' });
+        return res.end('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Station not found</title><link rel="stylesheet" href="/public/station.css"><main class="wrap"><article class="card"><h1>Station not found</h1><p class="muted">Check the link, or <a href="/">start your own station</a>.</p></article></main>');
+      }
+      const summary = st.description || `${st.name}, live on VoxGarden${st.city || st.country ? ` from ${[st.city, st.country].filter(Boolean).join(', ')}` : ''}.`;
+      const vars: Record<string, string> = {
+        title: esc(`${st.name} · Live on VoxGarden`),
+        name: esc(st.name),
+        description: esc(summary),
+        description_body: esc(st.description),
+        page_url: esc(st.page),
+        image_url: esc(st.logo ? PUBLIC_BASE + st.logo : `${PUBLIC_BASE}/public/default-logo.svg`),
+        logo_src: esc(st.logo ?? '/public/default-logo.svg'),
+        chips: [st.category, st.language, [st.city, st.country].filter(Boolean).join(', ')].filter(Boolean).map((c) => `<span>${esc(c)}</span>`).join(''),
+        mb_per_hour: String(Math.round((st.bitrate * 1000 / 8) * 3600 / 1e6)),
+        // Inside <script type="application/json">: escape "<" so the text can't close the tag.
+        json: JSON.stringify(st).replace(/</g, '\\u003c'),
+      };
+      const html = readFileSync(join(PUBLIC_DIR, 'station.html'), 'utf8').replace(/\{\{(\w+)\}\}/g, (_, k) => vars[k] ?? '');
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache' });
+      return res.end(html);
+    }
+
     if (req.method === 'GET' && url.pathname === '/meta/options') {
       return send(res, 200, { categories: CATEGORIES, languages: LANGUAGES });
     }
@@ -443,5 +508,4 @@ setInterval(tick, 250);
 // Boot: start every station that has audio, remove processes for deleted stations.
 reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))
   .catch((e) => console.warn('engine reconcile failed:', (e as Error).message));
-const port = Number(process.env.PORT ?? 4000);
-server.listen(port, '127.0.0.1', () => console.log(`control platform on http://127.0.0.1:${port}`));
+server.listen(PORT, '127.0.0.1', () => console.log(`control platform on http://127.0.0.1:${PORT}`));

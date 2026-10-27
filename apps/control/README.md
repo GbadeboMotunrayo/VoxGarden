@@ -19,6 +19,7 @@ API calls need a session cookie (from `/auth/signup` or `/auth/login`) and the h
 - Station wizard (FR-02): name, web address, description, category, language, country, city, logo (PNG/JPEG/WebP checked by content, max 2 MB). Owners can edit; the web address is permanent.
 - Engine: one Liquidsoap container per station (`vg-station-<slug>`), started on its first upload, restarted alone when its name changes. Icecast is shared.
 - Scheduling (FR-08): `GET/POST /stations/:slug/schedule`, `DELETE /stations/:slug/schedule/:id`. A 250 ms scheduler loop hands due items to the station; late by more than 60 s = missed.
+- Public station page (FR-10): `/s/<web-address>` and `GET /public/stations/<web-address>` (profile + on-air + listeners; no secrets). Set `VG_PUBLIC_BASE` (page links, previews) and `VG_STREAM_BASE` (listener stream host) in production.
 - Create station, upload/remove audio, AutoDJ playlist streams over Icecast at 64 kbps MP3.
 
 ## Known gaps (next)

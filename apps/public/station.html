@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<meta property="og:type" content="music.radio_station">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{page_url}}">
+<meta property="og:image" content="{{image_url}}">
+<meta name="twitter:card" content="summary">
+<meta name="theme-color" content="#14532d">
+<link rel="stylesheet" href="/public/station.css">
+</head>
+<body>
+<main class="wrap">
+  <article class="card">
+    <img class="logo" src="{{logo_src}}" alt="" width="128" height="128">
+    <h1>{{name}}</h1>
+    <p class="chips">{{chips}}</p>
+    <p class="desc">{{description_body}}</p>
+
+    <div class="player">
+      <button id="play" class="play" type="button" aria-label="Play {{name}}" disabled>
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>
+        <span class="spinner" aria-hidden="true"></span>
+      </button>
+      <div class="state">
+        <p id="status" class="status" role="status">Checking…</p>
+        <p id="listeners" class="muted small"></p>
+      </div>
+    </div>
+    <label class="vol">Volume <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+    <p class="muted small">Uses about {{mb_per_hour}} MB of data per hour.</p>
+
+    <div class="share">
+      <button id="share" class="btn" type="button">Share</button>
+      <a id="wa" class="btn" href="#" target="_blank" rel="noopener">WhatsApp</a>
+      <button id="copy" class="btn" type="button">Copy link</button>
+      <span id="copied" class="muted small" hidden>Link copied</span>
+    </div>
+  </article>
+  <p class="foot">Broadcasting on <strong>VoxGarden</strong>. <a href="/">Start your own station</a></p>
+</main>
+<audio id="audio" preload="none"></audio>
+<script id="station-data" type="application/json">{{json}}</script>
+<script src="/public/station.js"></script>
+</body>
+</html>

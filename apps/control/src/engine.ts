@@ -188,6 +188,33 @@ export function removeTrack(slug: string, filename: string): void {
   rmSync(join(mediaDir(slug), filename), { force: true });
 }
 
+// Where listeners reach Icecast. In production this is the public stream host.
+const STREAM_BASE = (process.env.VG_STREAM_BASE ?? 'http://localhost:8000').replace(/\/$/, '');
+// Where the control platform reaches Icecast itself (status, listener counts).
+const ICECAST_INTERNAL = process.env.VG_ICECAST_INTERNAL ?? 'http://127.0.0.1:8000';
+
 export function listenUrl(slug: string): string {
-  return `http://localhost:8000/${slug}`;
+  return `${STREAM_BASE}/${slug}`;
+}
+
+export const streamOrigin = () => new URL(STREAM_BASE).origin;
+
+// Which mounts are live and how many listeners each has, from Icecast's status
+// page. Cached briefly so a busy public page doesn't hammer Icecast.
+let statusCache: { at: number; mounts: Map<string, number> } | null = null;
+export async function mountStatus(): Promise<Map<string, number>> {
+  if (statusCache && Date.now() - statusCache.at < 5_000) return statusCache.mounts;
+  const mounts = new Map<string, number>();
+  try {
+    const res = await fetch(`${ICECAST_INTERNAL}/status-json.xsl`, { signal: AbortSignal.timeout(2_000) });
+    const src = (await res.json())?.icestats?.source ?? [];
+    for (const s of Array.isArray(src) ? src : [src]) {
+      const mount = new URL(s.listenurl).pathname.slice(1);
+      mounts.set(mount, Number(s.listeners) || 0);
+    }
+  } catch {
+    // Icecast unreachable: report every station off air rather than failing the page.
+  }
+  statusCache = { at: Date.now(), mounts };
+  return mounts;
 }

@@ -91,7 +91,7 @@ These need numbers before engineering can test against them:
 | FR-07 Create → Studio | Not built | |
 | FR-08 Scheduling | **Built** (27 Oct) | Pick a library track and a time; it starts on time (12-293 ms after the slot in tests), cuts off any earlier scheduled item, then AutoDJ resumes. Cancel, missed (>60 s late) and failed states. Single plays only: no recurring shows or playlists-in-a-slot yet. |
 | FR-09 Live | Not built | |
-| FR-10 Public player | Partial | Raw stream URL. No public station page. |
+| FR-10 Public player | **Built** (27 Oct) | `/s/<station>`: no login, logo, details, live/off-air status, listener count, play/pause that stops data use when paused, auto-reconnect, lock-screen controls, data-use note, WhatsApp/share/copy, link previews (title, description, logo). |
 | FR-11 Discovery | Not built | |
 | FR-12 Health | Not built | |
 | FR-13 Usage metering | Not built | |
