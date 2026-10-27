@@ -1,0 +1,26 @@
+# VoxGarden audio engine: Icecast (delivery) + Liquidsoap (playout).
+# The control platform writes engine/generated/main.liq and restarts liquidsoap.
+# Secrets live in engine/.env (git-ignored): see engine/.env.example
+services:
+  icecast:
+    image: moul/icecast
+    environment:
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD}
+      ICECAST_ADMIN_PASSWORD: ${ICECAST_ADMIN_PASSWORD}
+      ICECAST_PASSWORD: ${ICECAST_SOURCE_PASSWORD}
+      ICECAST_RELAY_PASSWORD: ${ICECAST_ADMIN_PASSWORD}
+    ports:
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+
+  liquidsoap:
+    image: savonet/liquidsoap:v2.3.2
+    command: ["/etc/liquidsoap/main.liq"]
+    environment:
+      ICECAST_SOURCE_PASSWORD: ${ICECAST_SOURCE_PASSWORD}
+    volumes:
+      - ./generated:/etc/liquidsoap:ro
+      - ./media:/media:ro
+    depends_on:
+      - icecast
+    restart: unless-stopped

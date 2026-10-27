@@ -1,0 +1,6 @@
+engine/generated/
+engine/media/
+engine/.env
+*.db
+*.db-*
+node_modules/
