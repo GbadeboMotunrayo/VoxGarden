@@ -32,7 +32,7 @@ fi
 mkdir -p data engine/media engine/generated
 
 # 3. Shared Icecast server
-docker compose -f engine/docker-compose.yml up -d --remove-orphans >/dev/null
+docker compose -f engine/docker-compose.yml --progress quiet up -d --remove-orphans
 ok "Icecast running on http://localhost:8000"
 
 # 4. Playout image (about 1 GB, first time only). Pulled now so the first upload isn't slow.

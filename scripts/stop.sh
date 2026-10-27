@@ -9,5 +9,5 @@ if [ -n "$ids" ]; then
   docker rm -f $ids >/dev/null
   echo "Stopped $(echo "$ids" | wc -l | tr -d ' ') station process(es)"
 fi
-docker compose -f engine/docker-compose.yml down >/dev/null
+docker compose -f engine/docker-compose.yml --progress quiet down
 echo "Stopped Icecast. Run 'npm start' again later; stations come back on their own."
