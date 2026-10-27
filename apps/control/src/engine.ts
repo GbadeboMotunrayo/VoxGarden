@@ -11,7 +11,7 @@ const ENGINE_DIR = resolve(import.meta.dirname, '../../../engine');
 const MEDIA_DIR = join(ENGINE_DIR, 'media');
 const GENERATED_DIR = join(ENGINE_DIR, 'generated');
 const IMAGE = 'savonet/liquidsoap:v2.3.2';
-const NETWORK = process.env.VG_ENGINE_NETWORK ?? 'engine_default';
+const NETWORK = process.env.VG_ENGINE_NETWORK ?? 'voxgarden-engine';
 const LABEL = 'voxgarden.station';
 // Liquidsoap needs far more memory while compiling its script at start-up than
 // when running, so the cap is set for the start-up peak (see docs/ENGINE-SPIKE.md).

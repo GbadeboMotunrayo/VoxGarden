@@ -1,7 +1,11 @@
 # VoxGarden audio engine: shared Icecast (delivery).
 # Playout is one Liquidsoap container per station, started by the control platform
 # (apps/control/src/engine.ts) on the network this file creates (engine_default).
-# Secrets live in engine/.env (git-ignored): see engine/.env.example
+# Secrets live in engine/.env (git-ignored), created by `npm run setup`.
+name: voxgarden-engine
+networks:
+  default:
+    name: voxgarden-engine
 services:
   icecast:
     image: moul/icecast
@@ -11,5 +15,6 @@ services:
       ICECAST_PASSWORD: ${ICECAST_SOURCE_PASSWORD}
       ICECAST_RELAY_PASSWORD: ${ICECAST_ADMIN_PASSWORD}
     ports:
-      - "127.0.0.1:8000:8000"
+      # 127.0.0.1 = this computer only. Set ICECAST_BIND=0.0.0.0 to let phones on your Wi-Fi listen.
+      - "${ICECAST_BIND:-127.0.0.1}:8000:8000"
     restart: unless-stopped

@@ -20,6 +20,8 @@ const STUDIO_FILES: Record<string, { name: string; type: string }> = {
 };
 const SECURE_COOKIE = process.env.VG_SECURE_COOKIE === '1'; // set to 1 behind HTTPS
 const PORT = Number(process.env.PORT ?? 4000);
+// 127.0.0.1 = this computer only. Set VG_HOST=0.0.0.0 to open the Studio to your Wi-Fi.
+const HOST = process.env.VG_HOST ?? '127.0.0.1';
 // Public address of this platform, used in share links and link previews.
 const PUBLIC_BASE = (process.env.VG_PUBLIC_BASE ?? `http://localhost:${PORT}`).replace(/\/$/, '');
 
@@ -32,7 +34,8 @@ const PUBLIC_FILES: Record<string, { name: string; type: string }> = {
 };
 const esc = (v: string) => v.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-const db = new DatabaseSync(process.env.VG_DB ?? 'voxgarden.db');
+mkdirSync(resolve(import.meta.dirname, '../../../data'), { recursive: true });
+const db = new DatabaseSync(process.env.VG_DB ?? resolve(import.meta.dirname, '../../../data/voxgarden.db'));
 db.exec('PRAGMA foreign_keys = ON');
 db.exec(`CREATE TABLE IF NOT EXISTS stations (
   id INTEGER PRIMARY KEY,
@@ -508,4 +511,4 @@ setInterval(tick, 250);
 // Boot: start every station that has audio, remove processes for deleted stations.
 reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))
   .catch((e) => console.warn('engine reconcile failed:', (e as Error).message));
-server.listen(PORT, '127.0.0.1', () => console.log(`control platform on http://127.0.0.1:${PORT}`));
+server.listen(PORT, HOST, () => console.log(`VoxGarden is running: open http://localhost:${PORT}`));

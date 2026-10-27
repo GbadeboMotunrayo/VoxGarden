@@ -1,0 +1,12 @@
+{
+  "name": "voxgarden",
+  "private": true,
+  "description": "Affordable, no-setup internet radio stations, plus a map to discover them.",
+  "license": "AGPL-3.0-only",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "setup": "bash scripts/setup.sh",
+    "start": "docker compose -f engine/docker-compose.yml up -d >/dev/null && node apps/control/src/server.ts",
+    "stop": "bash scripts/stop.sh"
+  }
+}
