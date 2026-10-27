@@ -147,7 +147,73 @@ async function loadTracks() {
     };
     return el('li', {}, el('span', {}, t.filename), el('span', { className: 'size' }, fmtSize(t.bytes), ' ', del));
   }));
+  // Keep the schedule's track picker in step with the library.
+  const pick = $('sched-track');
+  const keep = pick.value;
+  pick.replaceChildren(el('option', { value: '', textContent: tracks.length ? 'Choose a track…' : 'Upload a track first' }),
+    ...tracks.map((t) => el('option', { value: String(t.id), textContent: t.filename })));
+  if (tracks.some((t) => String(t.id) === keep)) pick.value = keep;
+  loadSchedule();
 }
+
+// ---- schedule (FR-08) ----
+$('tz').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'your local time';
+const fmtWhen = (ms) => new Date(ms).toLocaleString(undefined, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+// datetime-local wants "YYYY-MM-DDTHH:MM" in local time.
+const toLocalInput = (ms) => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+
+function statusText(item) {
+  if (item.status === 'sent') return item.lateness_ms <= 10_000 ? 'Played on time' : `Played ${Math.round(item.lateness_ms / 1000)} s late`;
+  return { missed: 'Missed', failed: 'Failed', cancelled: 'Cancelled' }[item.status] ?? item.status;
+}
+
+async function loadSchedule() {
+  if (!current) return;
+  const slug = current;
+  const { upcoming, past } = await api(`/stations/${slug}/schedule`);
+  if (slug !== current) return; // user switched station while this loaded
+  $('sched-none').hidden = upcoming.length > 0;
+  $('sched-nopast').hidden = past.length > 0;
+  $('sched-upcoming').replaceChildren(...upcoming.map((i) => {
+    const cancel = el('button', { className: 'btn small danger', type: 'button', textContent: 'Cancel' });
+    cancel.onclick = async () => {
+      cancel.disabled = true;
+      try { await api(`/stations/${slug}/schedule/${i.id}`, { method: 'DELETE' }); } catch (e) { alert(e.message); }
+      loadSchedule();
+    };
+    return el('li', {}, el('span', {}, el('span', { className: 'when', textContent: fmtWhen(i.starts_at) }), ' · ', i.filename), cancel);
+  }));
+  $('sched-past').replaceChildren(...past.map((i) => {
+    const badge = el('span', { className: `status ${i.status}`, textContent: statusText(i) });
+    if (i.error) badge.title = i.error;
+    return el('li', {}, el('span', {}, el('span', { className: 'when', textContent: fmtWhen(i.starts_at) }), ' · ', i.filename), badge);
+  }));
+}
+
+$('sched-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const err = $('sched-err');
+  err.hidden = true;
+  const media_id = Number($('sched-track').value);
+  const when = $('sched-when').value ? new Date($('sched-when').value).getTime() : NaN;
+  if (!media_id) { err.textContent = 'Choose a track.'; err.hidden = false; return; }
+  if (!Number.isFinite(when)) { err.textContent = 'Choose a date and time.'; err.hidden = false; return; }
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  try {
+    await api(`/stations/${current}/schedule`, { method: 'POST', body: JSON.stringify({ media_id, starts_at: when }) });
+    loadSchedule();
+  } catch (ex) {
+    err.textContent = ex.message;
+    err.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+};
+
+// Default the picker to five minutes from now, and refresh statuses while open.
+$('sched-when').value = toLocalInput(Date.now() + 5 * 60_000);
+setInterval(() => { if (current && !$('app').hidden && !document.hidden) loadSchedule().catch(() => {}); }, 5000);
 
 function renderStationHead(s) {
   $('st-name').textContent = s.name;

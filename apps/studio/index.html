@@ -91,6 +91,27 @@
         <ul id="tracks" class="tracks"></ul>
         <p id="no-tracks" class="muted" hidden>No tracks yet. Upload one to go on air.</p>
       </div>
+
+      <div class="card" id="schedule-card">
+        <h3>Schedule</h3>
+        <p class="muted small">A scheduled track starts at its time, interrupting whatever is playing. Afterwards the station goes back to its usual rotation. Times are in <span id="tz"></span>.</p>
+        <form id="sched-form" class="sched-form" novalidate>
+          <label>Track
+            <select id="sched-track" required></select>
+          </label>
+          <label>Date and time
+            <input id="sched-when" type="datetime-local" required>
+          </label>
+          <button class="btn primary auto" type="submit">Add to schedule</button>
+        </form>
+        <p id="sched-err" class="err" role="alert" hidden></p>
+        <h4 class="sub">Coming up</h4>
+        <ul id="sched-upcoming" class="tracks"></ul>
+        <p id="sched-none" class="muted small" hidden>Nothing scheduled.</p>
+        <h4 class="sub">Recent</h4>
+        <ul id="sched-past" class="tracks"></ul>
+        <p id="sched-nopast" class="muted small" hidden>No history yet.</p>
+      </div>
     </div>
   </section>
 </main>

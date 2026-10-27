@@ -1,6 +1,6 @@
 # Engine spike: our own engine vs AzuraCast
 
-Date: 27 October 2026. Status: **our-engine side measured; AzuraCast side incomplete** (see "What was not tested").
+Date: 27 October 2026. Status: **decided: keep our own engine** (Motunrayo, 27 Oct). AzuraCast side was not measured; see "What was not tested".
 Purpose: settle PRD Section 10 before building scheduling (FR-08).
 
 ## Criteria
@@ -50,6 +50,16 @@ Default to fix: Liquidsoap's live input waits for a **12-second** buffer by defa
 3. Set live buffer to 2 s.
 
 Confidence: **medium.** It rests on our own measurements for our engine, but AzuraCast was not measured side by side.
+
+## Follow-up: per-station processes (built 27 Oct)
+
+| Check | Result |
+|---|---|
+| Isolation | **Pass.** Two listeners on other stations stayed connected for a full 30 s while a new station process started and another was restarted by a rename. |
+| Memory | Liquidsoap **peaks at ~300 MB while starting** (script compile), then settles at **75-95 MB** per station. A 192 MB cap made stations crash-loop; the cap is now 512 MB and start-ups are staggered 4 s apart. |
+| Scheduling | Hard start: 5 back-to-back slots went on air **12-293 ms** after their time, each cutting off the previous scheduled item. |
+
+Hosting estimate stands: roughly 15-20 stations on a 2 GB server, as long as start-ups are staggered.
 
 ## What was not tested (and how to close it)
 

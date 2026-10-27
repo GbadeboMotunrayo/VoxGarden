@@ -84,12 +84,12 @@ These need numbers before engineering can test against them:
 |---|---|---|
 | FR-01 Accounts | **Built** (27 Oct) | Sign up, log in, log out, station ownership. No password reset or email verification yet. |
 | FR-02 Station wizard | **Built** (27 Oct) | 4 steps: name and web address, description/category/language, country/city, logo. Same wizard edits a station (owners only; web address is permanent). |
-| FR-03 Provisioning | Partial | Works, but adding a station restarts all stations. |
+| FR-03 Provisioning | **Built** (27 Oct) | One Liquidsoap process per station, started on first upload. Adding or changing a station no longer affects anyone else's listeners (tested). |
 | FR-04 Record on phone | Not built | |
 | FR-05 Editing | Not built | |
 | FR-06 Upload/organise | Partial | Upload and remove work. No organising, no validation of file contents. |
 | FR-07 Create → Studio | Not built | |
-| FR-08 Scheduling | **Not built** | Only random AutoDJ rotation. |
+| FR-08 Scheduling | **Built** (27 Oct) | Pick a library track and a time; it starts on time (12-293 ms after the slot in tests), cuts off any earlier scheduled item, then AutoDJ resumes. Cancel, missed (>60 s late) and failed states. Single plays only: no recurring shows or playlists-in-a-slot yet. |
 | FR-09 Live | Not built | |
 | FR-10 Public player | Partial | Raw stream URL. No public station page. |
 | FR-11 Discovery | Not built | |

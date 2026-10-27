@@ -25,7 +25,7 @@ Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifti
 
 1. **Create**: record and edit on a phone, send to your station.
 2. **Studio**: create a station, schedule, go live from the browser, manage presenters.
-3. **Engine**: streaming, AutoDJ, storage, invisible to users. Engine choice (our own on Liquidsoap + Icecast, or AzuraCast) is still open.
+3. **Engine**: streaming, AutoDJ, storage, invisible to users. Our own engine: Liquidsoap + Icecast, one Liquidsoap process per station (decided 27 Oct, see docs/ENGINE-SPIKE.md).
 4. **Globe**: a map where listeners discover stations.
 
 ## First milestone

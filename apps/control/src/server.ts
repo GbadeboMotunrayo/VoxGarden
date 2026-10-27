@@ -5,7 +5,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { type EngineStation, importTrack, listenUrl, mediaDir, reload, removeTrack, writeConfig } from './engine.ts';
+import { randomBytes } from 'node:crypto';
+import { type EngineStation, ensureRunning, importTrack, listenUrl, mediaDir, playNow, reconcile, removeTrack } from './engine.ts';
 import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
@@ -47,9 +48,33 @@ for (const [col, def] of [
   ['city', "TEXT NOT NULL DEFAULT ''"],
   ['logo_file', "TEXT NOT NULL DEFAULT ''"],
   ['logo_version', 'INTEGER NOT NULL DEFAULT 0'],
+  ['harbor_password', "TEXT NOT NULL DEFAULT ''"], // live input secret, never sent to clients
 ]) {
   if (!stationCols.has(col)) db.exec(`ALTER TABLE stations ADD COLUMN ${col} ${def}`);
 }
+
+// Give stations created before live input existed their own live-input secret.
+for (const r of db.prepare("SELECT id FROM stations WHERE harbor_password = ''").all() as { id: number }[]) {
+  db.prepare('UPDATE stations SET harbor_password = ? WHERE id = ?').run(randomBytes(18).toString('base64url'), r.id);
+}
+
+// Scheduling (FR-08): play a library track at a set time. filename is copied so the
+// history still reads correctly after a track is removed from the library.
+db.exec(`CREATE TABLE IF NOT EXISTS schedule (
+  id INTEGER PRIMARY KEY,
+  station_id INTEGER NOT NULL REFERENCES stations(id),
+  media_id INTEGER NOT NULL,
+  filename TEXT NOT NULL,
+  starts_at INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'missed', 'failed', 'cancelled')),
+  sent_at INTEGER,
+  lateness_ms INTEGER,
+  rid TEXT,
+  error TEXT,
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+db.exec('CREATE INDEX IF NOT EXISTS schedule_due ON schedule (status, starts_at)');
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MAX_UPLOAD = 200 * 1024 * 1024;
@@ -96,15 +121,21 @@ function imageType(b: Buffer): 'png' | 'jpg' | 'webp' | null {
 const IMAGE_MIME = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' } as const;
 
 const STATION_FIELDS = 's.slug, s.name, s.bitrate, s.description, s.category, s.language, s.country, s.city, s.logo_file, s.logo_version';
-type StationRow = EngineStation & Details & { logo_file: string; logo_version: number; role?: string };
+type StationRow = Omit<EngineStation, 'id' | 'harbor_password'> & Details & { logo_file: string; logo_version: number; role?: string };
 
 function presentStation(s: StationRow) {
   const { logo_file, logo_version, ...rest } = s;
   return { ...rest, logo: logo_file ? `/logos/${logo_file}?v=${logo_version}` : null, listen: listenUrl(s.slug) };
 }
 
-// Every station, for the engine config. Never sent to clients.
-const allStations = () => db.prepare('SELECT slug, name, bitrate FROM stations ORDER BY id').all() as unknown as EngineStation[];
+// Engine view of a station. Includes the live-input secret, so never sent to clients.
+const ENGINE_FIELDS = 'id, slug, name, bitrate, harbor_password';
+const engineStation = (id: number) => db.prepare(`SELECT ${ENGINE_FIELDS} FROM stations WHERE id = ?`).get(id) as unknown as EngineStation;
+// A station's process runs once it has audio; before that there is nothing to play.
+const stationsOnAir = () => db.prepare(
+  `SELECT ${ENGINE_FIELDS} FROM stations s WHERE EXISTS (SELECT 1 FROM media m WHERE m.station_id = s.id) ORDER BY id`,
+).all() as unknown as EngineStation[];
+const hasMedia = (id: number) => !!db.prepare('SELECT 1 FROM media WHERE station_id = ? LIMIT 1').get(id);
 
 const myStations = (userId: number) => db.prepare(
   `SELECT ${STATION_FIELDS}, m.role FROM stations s
@@ -238,8 +269,8 @@ const server = createServer(async (req, res) => {
       let id: number;
       try {
         db.exec('BEGIN');
-        const r = db.prepare('INSERT INTO stations (slug, name, description, category, language, country, city) VALUES (?, ?, ?, ?, ?, ?, ?)')
-          .run(slug, name.trim(), d.description, d.category, d.language, d.country ?? '', d.city ?? '');
+        const r = db.prepare('INSERT INTO stations (slug, name, description, category, language, country, city, harbor_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+          .run(slug, name.trim(), d.description, d.category, d.language, d.country ?? '', d.city ?? '', randomBytes(18).toString('base64url'));
         id = Number(r.lastInsertRowid);
         db.prepare("INSERT INTO station_members (station_id, user_id, role) VALUES (?, ?, 'owner')").run(id, user.id);
         db.exec('COMMIT');
@@ -247,9 +278,7 @@ const server = createServer(async (req, res) => {
         db.exec('ROLLBACK');
         return send(res, 409, { error: 'That web address is taken. Try another.' });
       }
-      mediaDir(slug);
-      writeConfig(allStations());
-      await reload();
+      mediaDir(slug); // the station's process starts with its first upload
       return send(res, 201, presentStation({ ...getStation(id), role: 'owner' }));
     }
 
@@ -273,10 +302,8 @@ const server = createServer(async (req, res) => {
         vals.push(v as string);
       }
       if (sets.length) db.prepare(`UPDATE stations SET ${sets.join(', ')} WHERE id = ?`).run(...vals, st.id);
-      if (input.name !== undefined) {
-        writeConfig(allStations());
-        await reload();
-      }
+      // The stream carries the station name, so restart this station's process only.
+      if (input.name !== undefined && hasMedia(st.id)) await ensureRunning(engineStation(st.id));
       return send(res, 200, presentStation({ ...getStation(st.id), role: st.role }));
     }
 
@@ -308,8 +335,9 @@ const server = createServer(async (req, res) => {
           const tmpFile = join(tmp, 'upload');
           writeFileSync(tmpFile, body);
           const saved = importTrack(st.slug, tmpFile, filename);
-          db.prepare('INSERT INTO media (station_id, filename, bytes) VALUES (?, ?, ?)').run(st.id, saved, body.length);
-          return send(res, 201, { filename: saved, bytes: body.length });
+          const r = db.prepare('INSERT INTO media (station_id, filename, bytes) VALUES (?, ?, ?)').run(st.id, saved, body.length);
+          await ensureRunning(engineStation(st.id)); // no-op if already running
+          return send(res, 201, { id: Number(r.lastInsertRowid), filename: saved, bytes: body.length });
         } finally {
           rmSync(tmp, { recursive: true, force: true });
         }
@@ -328,6 +356,41 @@ const server = createServer(async (req, res) => {
         if (!row) return send(res, 404, { error: 'No such track' });
         removeTrack(st.slug, row.filename);
         db.prepare('DELETE FROM media WHERE id = ?').run(row.id);
+        db.prepare("UPDATE schedule SET status = 'cancelled', error = 'Track removed from library' WHERE media_id = ? AND status = 'pending'").run(row.id);
+        return send(res, 200, { ok: true });
+      }
+    }
+
+    if (parts[0] === 'stations' && parts[2] === 'schedule') {
+      const st = stationFor(user, parts[1] ?? '');
+      if (!st) return send(res, 404, { error: 'No such station' });
+
+      // GET /stations/:slug/schedule  upcoming items, then the 20 most recent past ones
+      if (req.method === 'GET' && parts.length === 3) {
+        const cols = 'id, media_id, filename, starts_at, status, sent_at, lateness_ms, error';
+        const upcoming = db.prepare(`SELECT ${cols} FROM schedule WHERE station_id = ? AND status = 'pending' ORDER BY starts_at`).all(st.id);
+        const past = db.prepare(`SELECT ${cols} FROM schedule WHERE station_id = ? AND status != 'pending' ORDER BY starts_at DESC LIMIT 20`).all(st.id);
+        return send(res, 200, { upcoming, past, now: Date.now() });
+      }
+
+      // POST /stations/:slug/schedule  { media_id, starts_at }  starts_at: ms since epoch or ISO time
+      if (req.method === 'POST' && parts.length === 3) {
+        const { media_id, starts_at } = await readJson(req);
+        const when = typeof starts_at === 'number' ? starts_at : typeof starts_at === 'string' ? Date.parse(starts_at) : NaN;
+        if (!Number.isFinite(when)) return send(res, 400, { error: 'Choose a date and time' });
+        if (when < Date.now() - 5_000) return send(res, 400, { error: 'That time has already passed' });
+        if (when > Date.now() + 366 * 86_400_000) return send(res, 400, { error: 'You can schedule up to a year ahead' });
+        const m = db.prepare('SELECT id, filename FROM media WHERE id = ? AND station_id = ?').get(Number(media_id), st.id) as { id: number; filename: string } | undefined;
+        if (!m) return send(res, 400, { error: 'Choose a track from this station\'s library' });
+        const r = db.prepare('INSERT INTO schedule (station_id, media_id, filename, starts_at, created_by) VALUES (?, ?, ?, ?, ?)')
+          .run(st.id, m.id, m.filename, Math.round(when), user.id);
+        return send(res, 201, { id: Number(r.lastInsertRowid), media_id: m.id, filename: m.filename, starts_at: Math.round(when), status: 'pending' });
+      }
+
+      // DELETE /stations/:slug/schedule/:id  cancel an item that hasn't played yet
+      if (req.method === 'DELETE' && parts.length === 4) {
+        const r = db.prepare("UPDATE schedule SET status = 'cancelled' WHERE id = ? AND station_id = ? AND status = 'pending'").run(Number(parts[3]), st.id);
+        if (!r.changes) return send(res, 404, { error: 'Nothing to cancel: it has already played or does not exist' });
         return send(res, 200, { ok: true });
       }
     }
@@ -340,7 +403,45 @@ const server = createServer(async (req, res) => {
   }
 });
 
-// Regenerate engine config on boot so the DB is the source of truth.
-writeConfig(allStations());
+// ---- scheduler: hands due items to the station's engine ----
+// Items more than a minute late (e.g. the platform was down) are marked missed
+// rather than played at the wrong time.
+const MISSED_AFTER_MS = 60_000;
+let ticking = false;
+async function tick() {
+  if (ticking) return;
+  ticking = true;
+  try {
+    const due = db.prepare(
+      `SELECT sc.id, sc.station_id, sc.filename, sc.starts_at, s.slug FROM schedule sc
+       JOIN stations s ON s.id = sc.station_id WHERE sc.status = 'pending' AND sc.starts_at <= ? ORDER BY sc.starts_at`,
+    ).all(Date.now()) as { id: number; station_id: number; filename: string; starts_at: number; slug: string }[];
+    // Items due in the same tick for one station play back to back: only the first cuts in.
+    const startedThisTick = new Set<number>();
+    for (const item of due) {
+      const now = Date.now();
+      if (now - item.starts_at > MISSED_AFTER_MS) {
+        db.prepare("UPDATE schedule SET status = 'missed', error = 'The platform was not running at the scheduled time' WHERE id = ?").run(item.id);
+        continue;
+      }
+      try {
+        const rid = await playNow({ id: item.station_id, slug: item.slug }, item.filename, !startedThisTick.has(item.station_id));
+        startedThisTick.add(item.station_id);
+        const sentAt = Date.now();
+        db.prepare("UPDATE schedule SET status = 'sent', sent_at = ?, lateness_ms = ?, rid = ? WHERE id = ?")
+          .run(sentAt, sentAt - item.starts_at, rid, item.id);
+      } catch (e) {
+        db.prepare("UPDATE schedule SET status = 'failed', error = ? WHERE id = ?").run((e as Error).message.slice(0, 200), item.id);
+      }
+    }
+  } finally {
+    ticking = false;
+  }
+}
+setInterval(tick, 250);
+
+// Boot: start every station that has audio, remove processes for deleted stations.
+reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))
+  .catch((e) => console.warn('engine reconcile failed:', (e as Error).message));
 const port = Number(process.env.PORT ?? 4000);
 server.listen(port, '127.0.0.1', () => console.log(`control platform on http://127.0.0.1:${port}`));
