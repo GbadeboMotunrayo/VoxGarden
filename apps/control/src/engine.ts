@@ -1,7 +1,7 @@
 // Engine adapter: the only code that knows about Liquidsoap and Icecast.
 // Everything else calls these functions, so the engine can be swapped later.
 import { execFile } from 'node:child_process';
-import { mkdirSync, writeFileSync, copyFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const ENGINE_DIR = resolve(import.meta.dirname, '../../../engine');
@@ -61,6 +61,10 @@ export function importTrack(slug: string, srcPath: string, filename: string): st
   const dest = join(mediaDir(slug), safe);
   copyFileSync(srcPath, dest);
   return safe;
+}
+
+export function removeTrack(slug: string, filename: string): void {
+  rmSync(join(mediaDir(slug), filename), { force: true });
 }
 
 export function listenUrl(slug: string): string {

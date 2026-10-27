@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VoxGarden Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="mark" aria-hidden="true"></span><span>VoxGarden <b>Studio</b></span></div>
+  <div id="conn" class="conn" role="status">Connecting…</div>
+</header>
+
+<main class="layout">
+  <aside class="side" aria-label="Your stations">
+    <div class="side-head">
+      <h2>Your stations</h2>
+    </div>
+    <ul id="stations" class="station-list"></ul>
+    <form id="new-station" class="card new" autocomplete="off">
+      <h3>Plant a new station</h3>
+      <label>Station name
+        <input id="ns-name" required maxlength="80" placeholder="e.g. Unilag Campus FM">
+      </label>
+      <label>Web address
+        <span class="slug-row"><span class="pre">…/</span><input id="ns-slug" required maxlength="40" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="unilag-campus-fm"></span>
+      </label>
+      <p id="ns-err" class="err" role="alert" hidden></p>
+      <button class="btn primary" type="submit">Create station</button>
+    </form>
+  </aside>
+
+  <section class="main" id="main" aria-live="polite">
+    <div id="empty" class="empty">
+      <h1>Every voice deserves room to grow.</h1>
+      <p>Create your first station on the left. Name it, upload a few tracks, and it starts broadcasting.</p>
+    </div>
+
+    <div id="station" hidden>
+      <div class="station-head">
+        <div>
+          <h1 id="st-name"></h1>
+          <p class="muted" id="st-url"></p>
+        </div>
+        <span id="st-badge" class="badge">On air</span>
+      </div>
+
+      <div class="card player">
+        <h3>Listen live</h3>
+        <audio id="audio" controls preload="none"></audio>
+        <div class="row">
+          <button class="btn" id="copy">Copy listener link</button>
+          <span id="copied" class="muted" hidden>Copied</span>
+        </div>
+        <p class="hint">A new track can take a few seconds to join the rotation. If the player is silent, press play again.</p>
+      </div>
+
+      <div class="card">
+        <h3>Library <span id="count" class="muted"></span></h3>
+        <label id="drop" class="drop" tabindex="0">
+          <input id="file" type="file" accept="audio/*" multiple hidden>
+          <strong>Drop audio files here</strong>
+          <span>or click to choose. MP3, WAV, FLAC, OGG, M4A up to 200 MB each.</span>
+        </label>
+        <ul id="uploads" class="uploads"></ul>
+        <ul id="tracks" class="tracks"></ul>
+        <p id="no-tracks" class="muted" hidden>No tracks yet. Upload one to go on air.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+</body>
+</html>

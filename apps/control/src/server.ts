@@ -2,10 +2,17 @@
 // Run: node apps/control/src/server.ts   (Node 24+, no dependencies)
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { DatabaseSync } from 'node:sqlite';
-import { writeFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { type EngineStation, importTrack, listenUrl, mediaDir, reload, writeConfig } from './engine.ts';
+import { join, resolve } from 'node:path';
+import { type EngineStation, importTrack, listenUrl, mediaDir, reload, removeTrack, writeConfig } from './engine.ts';
+
+const STUDIO_DIR = resolve(import.meta.dirname, '../../studio');
+const STUDIO_FILES: Record<string, { name: string; type: string }> = {
+  '/index.html': { name: 'index.html', type: 'text/html; charset=utf-8' },
+  '/app.js': { name: 'app.js', type: 'text/javascript; charset=utf-8' },
+  '/style.css': { name: 'style.css', type: 'text/css; charset=utf-8' },
+};
 
 const db = new DatabaseSync(process.env.VG_DB ?? 'voxgarden.db');
 db.exec(`CREATE TABLE IF NOT EXISTS stations (
@@ -86,6 +93,34 @@ const server = createServer(async (req, res) => {
         return send(res, 201, { filename: saved, bytes: body.length });
       } finally {
         rmSync(tmp, { recursive: true, force: true });
+      }
+    }
+
+    // GET /stations/:slug/media
+    if (req.method === 'GET' && parts[0] === 'stations' && parts[2] === 'media' && parts.length === 3) {
+      const rows = db.prepare(
+        'SELECT m.id, m.filename, m.bytes, m.created_at FROM media m JOIN stations s ON s.id = m.station_id WHERE s.slug = ? ORDER BY m.id DESC',
+      ).all(parts[1]);
+      return send(res, 200, rows);
+    }
+
+    // DELETE /stations/:slug/media/:id
+    if (req.method === 'DELETE' && parts[0] === 'stations' && parts[2] === 'media' && parts.length === 4) {
+      const row = db.prepare(
+        'SELECT m.id, m.filename FROM media m JOIN stations s ON s.id = m.station_id WHERE s.slug = ? AND m.id = ?',
+      ).get(parts[1], Number(parts[3])) as { id: number; filename: string } | undefined;
+      if (!row) return send(res, 404, { error: 'no such track' });
+      removeTrack(parts[1], row.filename);
+      db.prepare('DELETE FROM media WHERE id = ?').run(row.id);
+      return send(res, 200, { ok: true });
+    }
+
+    // Studio UI (static, fixed file list so no path traversal is possible)
+    if (req.method === 'GET') {
+      const file = STUDIO_FILES[url.pathname === '/' ? '/index.html' : url.pathname];
+      if (file) {
+        res.writeHead(200, { 'content-type': file.type, 'cache-control': 'no-cache' });
+        return res.end(readFileSync(join(STUDIO_DIR, file.name)));
       }
     }
 
