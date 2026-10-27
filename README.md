@@ -6,7 +6,7 @@ VoxGarden lets anyone start an internet radio station from a phone or a laptop, 
 
 Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifting others.*
 
-> Status: **idea and research stage.** No code yet. This repo holds the thinking so all three of us can edit it, argue with it and then build from it.
+> Status: **PRD drafted, awaiting founder sign-off.** The code in `apps/` and `engine/` is a technical proof of concept, not the MVP.
 
 ## Start here
 
@@ -16,13 +16,15 @@ Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifti
 | [docs/BETTER.md](docs/BETTER.md) | Where we deliberately go beyond Radio Garden and Radio.co, and why. |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | How the pieces connect, and the build order. |
 | [docs/RESEARCH.md](docs/RESEARCH.md) | What we checked, what we could not confirm, and the open questions. |
+| [docs/PRD.md](docs/PRD.md) | Product requirements and MVP definition (draft v1.0). |
+| [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md) | Review of the PRD, proposed MVP-0 scope, and what is built vs required. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How the three of us (and later others) work in this repo. |
 
 ## The four products, one account
 
 1. **Create**: record and edit on a phone, send to your station.
 2. **Studio**: create a station, schedule, go live from the browser, manage presenters.
-3. **Engine**: streaming, AutoDJ, storage (AzuraCast underneath, invisible to users).
+3. **Engine**: streaming, AutoDJ, storage, invisible to users. Engine choice (our own on Liquidsoap + Icecast, or AzuraCast) is still open.
 4. **Globe**: a map where listeners discover stations.
 
 ## First milestone
