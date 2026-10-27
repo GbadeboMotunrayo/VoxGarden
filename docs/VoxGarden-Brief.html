@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>VoxGarden Brief</title>
+<style>
+@page { size: A4; margin: 18mm 16mm; }
+body { font: 11pt/1.55 Georgia, 'Times New Roman', serif; color: #1c2a22; margin: 0; }
+h1 { font: 700 34pt/1.1 Helvetica, Arial, sans-serif; color: #14532d; margin: 0 0 4px; }
+h2 { font: 700 15pt Helvetica, Arial, sans-serif; color: #14532d; margin: 22px 0 6px; border-bottom: 2px solid #bbf7d0; padding-bottom: 3px; }
+h3 { font: 700 11.5pt Helvetica, Arial, sans-serif; margin: 12px 0 2px; }
+.tag { font: italic 14pt Georgia, serif; color: #3f6212; margin: 0 0 14px; }
+.meta { font: 9.5pt Helvetica, Arial, sans-serif; color: #555; }
+table { page-break-inside: avoid; border-collapse: collapse; width: 100%; font: 10pt Helvetica, Arial, sans-serif; margin: 6px 0; }
+th, td { border: 1px solid #d1d5db; padding: 5px 8px; text-align: left; vertical-align: top; }
+th { background: #ecfdf5; }
+.box { background: #f0fdf4; border-left: 5px solid #16a34a; padding: 10px 14px; margin: 14px 0; page-break-inside: avoid; }
+ul, ol { margin: 4px 0 4px 20px; padding: 0; }
+li { margin: 2px 0; }
+.blank { border-bottom: 1px solid #333; display: inline-block; width: 70%; height: 1em; }
+</style></head><body>
+
+<h1>VoxGarden</h1>
+<p class="tag">Every voice deserves room to grow.</p>
+<p class="meta">Founders: Ayobami · Bamidele · Motunrayo &nbsp;|&nbsp; Brief, 27 October 2026 &nbsp;|&nbsp; Idea and research stage &nbsp;|&nbsp; Repo: github.com/GbadeboMotunrayo/VoxGarden</p>
+
+<h2>In one sentence</h2>
+<p>VoxGarden lets ordinary people run their own internet radio station cheaply and without technical knowledge, and lets listeners find those stations on a map of the world.</p>
+
+<h2>The problem</h2>
+<p>A traditional station needs a licence, a transmitter, a studio and staff. Many people with good ideas never get a microphone: a presenter limited by their employer, a student with no campus station, a community whose language nobody covers. Internet radio removes the transmitter, but current tools are priced in dollars or built for people who already know what an encoder is. The gap is price, setup and being found.</p>
+
+<h2>What we are building</h2>
+<p>Four products, one account, one station identity, one media library.</p>
+<table>
+<tr><th>Product</th><th>What it does</th></tr>
+<tr><td><b>Create</b> (phone)</td><td>Record, trim and polish a programme on a phone you already own, then tap "Send to my station". Basic editing happens on the device to save data.</td></tr>
+<tr><td><b>Studio</b> (web)</td><td>Sign up, name your station, upload audio, schedule shows, invite co-presenters, press Go Live from the browser.</td></tr>
+<tr><td><b>Engine</b> (hidden)</td><td>Streaming, scheduled playback and storage. Built on AzuraCast, an open-source radio suite that users never see.</td></tr>
+<tr><td><b>Globe</b> (listeners)</td><td>A spinning globe, inspired by Radio Garden. Pick a place, hear a live station. No account needed.</td></tr>
+</table>
+
+<h2>Who it is for</h2>
+<p>Independent broadcasters, schools and universities, communities and language groups, creators, and experienced presenters who want independence. Our proposed first focus is <b>university campus stations</b>: ready audience, ready presenters, real training value.</p>
+
+<h2>How it earns money (hypotheses to test)</h2>
+<table>
+<tr><th>Plan</th><th>For</th><th>Idea</th></tr>
+<tr><td>Community (free)</td><td>Beginners</td><td>One station, small storage, listed on the Globe</td></tr>
+<tr><td>Independent</td><td>Serious solo broadcasters</td><td>More storage, analytics, extra presenters</td></tr>
+<tr><td>Professional</td><td>Commercial stations, teams</td><td>Teams, ad tools, branded player</td></tr>
+<tr><td>Campus</td><td>Schools, universities</td><td>Student accounts, oversight, training</td></tr>
+</table>
+<p>Rule: never promise unlimited listeners at a flat price. Bandwidth and storage cost real money.</p>
+
+<h2>Where we go beyond the original idea</h2>
+<ul>
+<li><b>Campuses first</b>: five good campus stations prove more than five hundred solo broadcasters.</li>
+<li><b>Music rights solved up front</b>: a "Seed Library" of independent artists who opt in, so stations have legal music and artists get airplay. Talk formats need no music licence.</li>
+<li><b>Built for weak data and cheap Android phones</b>: data-light listening mode, resumable uploads, flat-map fallback.</li>
+<li><b>Safe Go Live</b>: mic test, on-air indicator, automatic fallback to scheduled playback if a presenter drops.</li>
+<li><b>Globe pre-filled</b> from public station directories so it is never empty on day one.</li>
+<li><b>Compliance checklist</b> for every station; pricing in naira via local payment providers.</li>
+<li><b>"We rise by lifting others" as a feature</b>: paying stations sponsor free ones; new stations get a mentor.</li>
+</ul>
+
+<h2>What we have not confirmed yet</h2>
+<div class="box">
+<ul>
+<li><b>Nigerian regulation.</b> The NBC says online broadcasters must register; one document suggested a very large internet-radio licence fee. Unverified. This could change the whole business model, so we need a Nigerian media lawyer early.</li>
+<li><b>Music collecting societies</b> (COSON / MCSN): current position disputed in reports we found.</li>
+<li><b>The name.</b> No existing VoxGarden trademark turned up, but that is not a proper clearance search.</li>
+<li><b>Whether people will pay</b>, and what one listener really costs us.</li>
+<li><b>Browser live broadcasting on phones</b> over weak connections.</li>
+</ul>
+</div>
+
+<h2>First build step (already started)</h2>
+<p>Run the AzuraCast engine, then test: create a station, play a track, go live from a browser and an Android phone, create a second station through its API, and measure cost per listener. Only then do we build the Studio on top.</p>
+
+<h2>Working as partners</h2>
+<p>Suggested lanes, to be agreed: <b>Ayobami</b> partnerships, broadcaster relationships and licensing questions; <b>Bamidele</b> product, audio infrastructure and technical operations; <b>Motunrayo</b> community, creators, education partnerships and brand. Before real money or code is involved we write a founders' agreement covering ownership, contribution, IP, pay, exits and disagreements, with a lawyer.</p>
+
+<h2 style="page-break-before: always">What I need from you</h2>
+<ol>
+<li>Your <b>GitHub username</b> (free account at github.com if you have none): <span class="blank"></span></li>
+<li>Your preferred <b>email</b> for updates: <span class="blank"></span></li>
+<li>Your closest <b>lane</b> (partnerships / product and infrastructure / community and education): <span class="blank"></span></li>
+<li>Realistic <b>hours per week</b> and start date: <span class="blank"></span></li>
+<li>Your biggest <b>question or worry</b> about this: <span class="blank"></span></li>
+</ol>
+<p class="meta">Please never send passwords, keys or tokens in the repo or in chat. The repository is public.</p>
+
+</body></html>
