@@ -38,6 +38,8 @@ function showAuth() {
   $('auth').hidden = false;
   $('who').hidden = true;
   $('logout').hidden = true;
+  $('admin-btn').hidden = true;
+  $('admin').hidden = true;
   $('conn').hidden = true;
 }
 
@@ -49,6 +51,8 @@ function showApp(user) {
   $('logout').hidden = false;
   $('conn').hidden = false;
   loadStations();
+  // Founders get the platform-wide usage view.
+  api('/auth/me').then(({ admin }) => { $('admin-btn').hidden = !admin; }).catch(() => {});
 }
 
 $('auth-form').onsubmit = async (e) => {
@@ -118,6 +122,7 @@ async function select(slug) {
   current = slug;
   document.querySelectorAll('#stations button').forEach((b, i) => b.setAttribute('aria-current', String(stations[i].slug === slug)));
   $('empty').hidden = true;
+  $('admin').hidden = true;
   $('station').hidden = false;
   renderStationHead(s);
   // A recording waiting to be sent goes to whichever station is selected.
@@ -159,6 +164,7 @@ async function loadTracks() {
     ...tracks.map((t) => el('option', { value: String(t.id), textContent: t.title || t.filename })));
   if (tracks.some((t) => String(t.id) === keep)) pick.value = keep;
   loadSchedule();
+  loadUsage().catch(() => {});
 }
 
 // ---- schedule (FR-08) ----
@@ -694,4 +700,60 @@ $('rec-send').onclick = () => {
   };
   xhr.onerror = () => done('Upload failed: check your connection and press Send again. Your recording is still here.');
   xhr.send(rec.blob);
+};
+
+// ---- usage (FR-13) ----
+const fmtBytes = (b) => (b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(1)} MB` : `${Math.round(b / 1e3)} KB`);
+const fmtNum = (n) => (n >= 100 ? Math.round(n).toLocaleString() : String(n));
+
+async function loadUsage() {
+  if (!current) return;
+  const slug = current;
+  const u = await api(`/stations/${slug}/usage?days=30`);
+  if (slug !== current) return;
+  $('u-hours').textContent = fmtNum(u.listener_hours);
+  $('u-peak').textContent = String(u.peak_listeners);
+  $('u-streamed').textContent = fmtBytes(u.streamed_bytes);
+  $('u-processed').textContent = fmtNum(u.processed_minutes);
+  $('u-storage').textContent = fmtBytes(u.storage_bytes);
+  $('u-quota').textContent = fmtBytes(u.storage_quota_bytes);
+  const pct = Math.min(100, (u.storage_bytes / u.storage_quota_bytes) * 100);
+  $('u-storage-bar').style.width = `${pct}%`;
+  $('u-storage-bar').style.background = pct > 90 ? 'var(--danger)' : '';
+  const max = Math.max(...u.daily.map((d) => d.listener_hours), 0);
+  $('u-chart').replaceChildren(...u.daily.map((d) => {
+    const bar = el('div', { title: `${d.day}: ${d.listener_hours} listener-hours, peak ${d.peak_listeners}` });
+    bar.style.height = max ? `${Math.max(2, (d.listener_hours / max) * 100)}%` : '2%';
+    if (!d.listener_hours) bar.className = 'zero';
+    return bar;
+  }));
+  $('u-from').textContent = new Date(u.daily[0].day).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+async function showAdmin() {
+  const u = await api('/admin/usage?days=30');
+  $('a-days').textContent = String(u.days);
+  const t = u.totals;
+  $('a-totals').replaceChildren(...[
+    [t.stations, 'stations'], [fmtNum(t.listener_hours), 'listener-hours'], [fmtBytes(t.streamed_bytes), 'streamed (est.)'],
+    [fmtBytes(t.storage_bytes), 'storage used'], [fmtNum(t.processed_minutes), 'recording minutes processed'],
+  ].map(([v, label]) => el('div', {}, el('strong', { textContent: String(v) }), el('span', { textContent: label }))));
+  $('a-rows').replaceChildren(...u.stations.map((r) => el('tr', {},
+    el('td', {}, el('a', { href: `/s/${r.slug}`, target: '_blank', rel: 'noopener', textContent: r.name })),
+    el('td', { textContent: r.owner ?? '—' }),
+    el('td', { className: 'num', textContent: fmtNum(r.listener_hours) }),
+    el('td', { className: 'num', textContent: String(r.peak_listeners) }),
+    el('td', { className: 'num', textContent: fmtBytes(r.streamed_bytes) }),
+    el('td', { className: 'num', textContent: fmtBytes(r.storage_bytes) }),
+    el('td', { className: 'num', textContent: `${fmtNum(r.processed_minutes)} min` }),
+  )));
+  $('empty').hidden = true;
+  $('station').hidden = true;
+  $('admin').hidden = false;
+  document.querySelectorAll('#stations button').forEach((b) => b.setAttribute('aria-current', 'false'));
+}
+$('admin-btn').onclick = () => showAdmin().catch((e) => alert(e.message));
+$('admin-close').onclick = () => {
+  $('admin').hidden = true;
+  if (current) select(current); else $('empty').hidden = stations.length > 0;
 };

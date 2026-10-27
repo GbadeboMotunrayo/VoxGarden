@@ -6,7 +6,7 @@ VoxGarden lets anyone start an internet radio station from a phone or a laptop, 
 
 Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifting others.*
 
-> Status: **building MVP-0, testing locally.** Built so far: accounts, station wizard, uploads, recording with trim, per-station engine, scheduling, public station page. Not yet: usage metering, Go Live button, HTTPS (needed for recording on phones). Details in [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md).
+> Status: **building MVP-0, testing locally.** **All MVP-0 items are built**: accounts, station wizard, uploads, recording with trim, per-station engine, scheduling, public station page, usage metering. Not yet: Go Live button, HTTPS (needed for recording on phones), password reset. Details in [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md).
 
 ## Run it on your computer
 
@@ -26,6 +26,8 @@ Then try the whole flow:
 3. Click **Public page ↗**: that's what listeners see. Press play.
 4. In **Record a programme**, record a few seconds (allow the microphone), drag Start/End to trim, add a title and **Send**.
 5. In **Schedule**, pick the track and a time a minute or two ahead. Watch it move to *Played on time*.
+
+**Founders:** to see every station's usage, start with your emails: `VG_ADMIN_EMAILS=you@example.com npm start`, then use **Platform usage** in the header.
 
 Stop everything with `Ctrl+C`, then `npm run stop`. Your accounts, stations and audio stay in `data/` and `engine/media/` (both git-ignored), and come back on the next `npm start`.
 
@@ -51,6 +53,7 @@ Nothing here is public: by default everything listens on your computer only.
 | [docs/PRD.md](docs/PRD.md) | Product requirements and MVP definition (draft v1.0). |
 | [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md) | Review of the PRD, proposed MVP-0 scope, and what is built vs required. |
 | [docs/ENGINE-SPIKE.md](docs/ENGINE-SPIKE.md) | Engine test results: our own engine vs AzuraCast. |
+| [docs/USAGE.md](docs/USAGE.md) | What usage we measure, how accurately, and how to turn it into prices. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How the three of us (and later others) work in this repo. |
 
 ## The four products, one account

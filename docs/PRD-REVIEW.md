@@ -94,7 +94,7 @@ These need numbers before engineering can test against them:
 | FR-10 Public player | **Built** (27 Oct) | `/s/<station>`: no login, logo, details, live/off-air status, listener count, play/pause that stops data use when paused, auto-reconnect, lock-screen controls, data-use note, WhatsApp/share/copy, link previews (title, description, logo). |
 | FR-11 Discovery | Not built | |
 | FR-12 Health | Not built | |
-| FR-13 Usage metering | Not built | |
+| FR-13 Usage metering | **Built** (27 Oct) | Listener-hours, peak listeners, data streamed (estimate), on-air time, uploads, recording minutes and storage, per station per day. Studio usage card; founders-only platform view (`VG_ADMIN_EMAILS`); storage limit per station enforced. See docs/USAGE.md. |
 
 NFR security: auth and server-side permissions now in place; upload content validation, quotas and rate limits beyond login still missing. Everything built so far is a technical proof of concept (PRD Phase 1), not MVP work, and should be described that way.
 

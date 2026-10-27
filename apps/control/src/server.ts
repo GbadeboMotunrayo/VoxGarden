@@ -11,6 +11,7 @@ import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
 } from './auth.ts';
+import { addUsage, migrateUsage, platformUsage, startListenerSampler, stationUsage, storageBytes } from './usage.ts';
 
 const STUDIO_DIR = resolve(import.meta.dirname, '../../studio');
 const STUDIO_FILES: Record<string, { name: string; type: string }> = {
@@ -96,6 +97,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS schedule (
 )`);
 db.exec('CREATE INDEX IF NOT EXISTS schedule_due ON schedule (status, starts_at)');
 
+migrateUsage(db);
+
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MAX_UPLOAD = 200 * 1024 * 1024;
 const MAX_LOGO = 2 * 1024 * 1024;
@@ -142,6 +145,23 @@ function audioType(b: Buffer): 'webm' | 'ogg' | 'm4a' | 'wav' | 'mp3' | null {
   return null;
 }
 const MAX_RECORDING_S = 3 * 3600;
+
+// ---- usage limits and founder access (FR-13) ----
+// Storage per station. A free-tier hypothesis, not a price: change it with VG_STORAGE_QUOTA_MB.
+// Decimal megabytes (1 MB = 1,000,000 bytes), matching how the Studio displays sizes.
+const STORAGE_QUOTA = Number(process.env.VG_STORAGE_QUOTA_MB ?? 1000) * 1_000_000;
+// Founders who can see every station's usage: comma-separated emails.
+const ADMINS = new Set((process.env.VG_ADMIN_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean));
+const isAdmin = (u: User) => ADMINS.has(u.email);
+// Refuses an upload that would take the station over its storage quota.
+function quotaProblem(stationId: number, incoming: number): string | null {
+  const used = storageBytes(db, stationId);
+  if (used + incoming <= STORAGE_QUOTA) return null;
+  const mb = (b: number) => (b / 1_000_000).toFixed(1).replace(/\.0$/, '');
+  return `Not enough storage: this station has used ${mb(used)} MB of its ${mb(STORAGE_QUOTA)} MB, and this needs ${mb(incoming)} MB. Remove old tracks to make room.`;
+}
+// Size of a request body before reading it, when the client says.
+const declaredSize = (req: IncomingMessage) => Number(req.headers['content-length'] ?? 0) || 0;
 
 // Only real PNG, JPEG or WebP images are accepted as logos (checked by content, not name).
 function imageType(b: Buffer): 'png' | 'jpg' | 'webp' | null {
@@ -337,7 +357,22 @@ const server = createServer(async (req, res) => {
     const user = currentUser(db, req);
     if (!user) return send(res, 401, { error: 'Please log in' });
 
-    if (req.method === 'GET' && url.pathname === '/auth/me') return send(res, 200, { user });
+    if (req.method === 'GET' && url.pathname === '/auth/me') return send(res, 200, { user, admin: isAdmin(user) });
+
+    // GET /admin/usage?days=30  every station's usage, for the founders only
+    if (req.method === 'GET' && url.pathname === '/admin/usage') {
+      if (!isAdmin(user)) return send(res, 404, { error: 'not found' });
+      const days = Math.min(90, Math.max(1, Number(url.searchParams.get('days')) || 30));
+      return send(res, 200, { ...platformUsage(db, days), storage_quota_bytes: STORAGE_QUOTA });
+    }
+
+    // GET /stations/:slug/usage?days=30  this station's usage, for its members
+    if (req.method === 'GET' && parts[0] === 'stations' && parts[2] === 'usage' && parts.length === 3) {
+      const st = stationFor(user, parts[1]);
+      if (!st) return send(res, 404, { error: 'No such station' });
+      const days = Math.min(90, Math.max(1, Number(url.searchParams.get('days')) || 30));
+      return send(res, 200, { ...stationUsage(db, st.id, engineStation(st.id).bitrate, days), storage_quota_bytes: STORAGE_QUOTA });
+    }
 
     if (req.method === 'GET' && url.pathname === '/stations') {
       return send(res, 200, myStations(user.id).map(presentStation));
@@ -417,6 +452,9 @@ const server = createServer(async (req, res) => {
       if (!title || title.length > 80) return send(res, 400, { error: 'Give the recording a title (max 80 characters)' });
       if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end - start < 0.5) return send(res, 400, { error: 'The kept part must be at least half a second long' });
       if (end - start > MAX_RECORDING_S) return send(res, 400, { error: 'Recordings can be up to 3 hours' });
+      // The stored file is 64 kbps MP3: 8,000 bytes per second kept.
+      const full = quotaProblem(st.id, Math.round((end - start) * 8000));
+      if (full) return send(res, 413, { error: full });
       const body = await readBody(req, MAX_UPLOAD);
       const ext = audioType(body);
       if (!ext) return send(res, 400, { error: 'That does not look like an audio recording' });
@@ -429,6 +467,7 @@ const server = createServer(async (req, res) => {
         const saved = importTrack(st.slug, out, `${base}-${new Date().toISOString().slice(0, 10)}.mp3`);
         const bytes = readFileSync(join(mediaDir(st.slug), saved)).length;
         const r = db.prepare('INSERT INTO media (station_id, filename, bytes, title) VALUES (?, ?, ?, ?)').run(st.id, saved, bytes, title);
+        addUsage(db, st.id, { upload_bytes: body.length, processed_seconds: end - start, conversions: 1 });
         await ensureRunning(engineStation(st.id));
         return send(res, 201, { id: Number(r.lastInsertRowid), filename: saved, title, bytes, seconds: Math.round((end - start) * 10) / 10 });
       } catch (e) {
@@ -446,13 +485,18 @@ const server = createServer(async (req, res) => {
       if (req.method === 'POST' && parts.length === 3) {
         const filename = url.searchParams.get('filename') ?? '';
         if (!/\.(mp3|ogg|opus|wav|flac|m4a|aac)$/i.test(filename)) return send(res, 400, { error: 'Only audio files (mp3, wav, flac, ogg, opus, m4a, aac)' });
+        const early = quotaProblem(st.id, declaredSize(req)); // refuse before receiving a big file
+        if (early) return send(res, 413, { error: early });
         const body = await readBody(req, MAX_UPLOAD);
+        const full = quotaProblem(st.id, body.length);
+        if (full) return send(res, 413, { error: full });
         const tmp = mkdtempSync(join(tmpdir(), 'vg-'));
         try {
           const tmpFile = join(tmp, 'upload');
           writeFileSync(tmpFile, body);
           const saved = importTrack(st.slug, tmpFile, filename);
           const r = db.prepare('INSERT INTO media (station_id, filename, bytes) VALUES (?, ?, ?)').run(st.id, saved, body.length);
+          addUsage(db, st.id, { upload_bytes: body.length });
           await ensureRunning(engineStation(st.id)); // no-op if already running
           return send(res, 201, { id: Number(r.lastInsertRowid), filename: saved, bytes: body.length });
         } finally {
@@ -556,6 +600,9 @@ async function tick() {
   }
 }
 setInterval(tick, 250);
+
+// Listener time per station, sampled from Icecast (FR-13).
+startListenerSampler(db, mountStatus, Number(process.env.VG_USAGE_SAMPLE_MS ?? 30_000));
 
 // Boot: start every station that has audio, remove processes for deleted stations.
 reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))

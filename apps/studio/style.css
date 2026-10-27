@@ -133,6 +133,23 @@ fieldset { border: 0; padding: 0; margin: 0; }
 .progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 12px; }
 .progress div { height: 100%; width: 0; background: var(--green); }
 
+/* usage (FR-13) */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
+.stats div { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); }
+.stats strong { display: block; font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.stats span { font-size: .8rem; color: var(--muted); }
+.chart { display: flex; align-items: flex-end; gap: 2px; height: 80px; border-bottom: 1px solid var(--line); }
+.chart div { flex: 1; background: var(--green); border-radius: 2px 2px 0 0; min-height: 1px; opacity: .85; }
+.chart div.zero { background: var(--line); }
+.chart-axis { display: flex; justify-content: space-between; margin: 4px 0 12px; }
+.storage-line { margin: 0 0 6px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.usage-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.usage-table th, .usage-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.usage-table th { font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.usage-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.usage-table tr:last-child td { border-bottom: 0; }
+
 /* schedule */
 .sched-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; align-items: end; }
 @media (max-width: 640px) { .sched-form { grid-template-columns: 1fr; } }
@@ -166,3 +183,12 @@ h4.sub { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; col
 .tracks li span:first-child, .uploads li span:first-child { overflow-wrap: anywhere; }
 .size { color: var(--muted); font-size: .85rem; white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* Grid children default to min-width:auto, which let the wide usage table push the page sideways. */
+.layout > * { min-width: 0; }
+.usage-table a { color: var(--green); font-weight: 600; text-decoration: none; }
+.usage-table a:hover { text-decoration: underline; }
+@media (max-width: 560px) {
+  .top { padding: 10px 16px; }
+  .conn { display: none; }
+}

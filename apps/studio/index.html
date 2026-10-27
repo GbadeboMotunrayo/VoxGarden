@@ -11,6 +11,7 @@
   <div class="brand"><span class="mark" aria-hidden="true"></span><span>VoxGarden <b>Studio</b></span></div>
   <div class="top-right">
     <div id="conn" class="conn" role="status">Connecting…</div>
+    <button id="admin-btn" class="btn small" type="button" hidden>Platform usage</button>
     <span id="who" class="muted" hidden></span>
     <button id="logout" class="btn small" type="button" hidden>Log out</button>
   </div>
@@ -52,6 +53,23 @@
       <h1>Every voice deserves room to grow.</h1>
       <p>Set up your first station in four short steps: name it, describe it, say where it's from, and add a logo.</p>
       <button id="empty-new" class="btn primary auto" type="button">Plant your first station</button>
+    </div>
+
+    <div id="admin" hidden>
+      <div class="station-head">
+        <div class="grow">
+          <h1>Platform usage</h1>
+          <p class="muted">Every station, last <span id="a-days">30</span> days. Visible to founders only.</p>
+        </div>
+        <button id="admin-close" class="btn small" type="button">Back to stations</button>
+      </div>
+      <div class="stats" id="a-totals"></div>
+      <div class="table-wrap">
+        <table class="usage-table">
+          <thead><tr><th>Station</th><th>Owner</th><th class="num">Listener-hours</th><th class="num">Peak</th><th class="num">Streamed</th><th class="num">Storage</th><th class="num">Processed</th></tr></thead>
+          <tbody id="a-rows"></tbody>
+        </table>
+      </div>
     </div>
 
     <div id="station" hidden>
@@ -156,6 +174,21 @@
         <h4 class="sub">Recent</h4>
         <ul id="sched-past" class="tracks"></ul>
         <p id="sched-nopast" class="muted small" hidden>No history yet.</p>
+      </div>
+
+      <div class="card" id="usage-card">
+        <h3>Usage <span class="muted small">last 30 days</span></h3>
+        <div class="stats">
+          <div><strong id="u-hours">–</strong><span>listener-hours</span></div>
+          <div><strong id="u-peak">–</strong><span>most listeners at once</span></div>
+          <div><strong id="u-streamed">–</strong><span>data sent to listeners (est.)</span></div>
+          <div><strong id="u-processed">–</strong><span>recording minutes processed</span></div>
+        </div>
+        <div class="chart" id="u-chart" role="img" aria-label="Listener-hours per day"></div>
+        <p class="muted small chart-axis"><span id="u-from"></span><span>today</span></p>
+        <p class="small storage-line">Storage: <strong id="u-storage">–</strong> of <span id="u-quota">–</span></p>
+        <div class="progress"><div id="u-storage-bar"></div></div>
+        <p class="muted small">Listener time is sampled every 30 seconds while VoxGarden is running.</p>
       </div>
     </div>
   </section>
