@@ -18,6 +18,7 @@ Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifti
 | [docs/RESEARCH.md](docs/RESEARCH.md) | What we checked, what we could not confirm, and the open questions. |
 | [docs/PRD.md](docs/PRD.md) | Product requirements and MVP definition (draft v1.0). |
 | [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md) | Review of the PRD, proposed MVP-0 scope, and what is built vs required. |
+| [docs/ENGINE-SPIKE.md](docs/ENGINE-SPIKE.md) | Engine test results: our own engine vs AzuraCast. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How the three of us (and later others) work in this repo. |
 
 ## The four products, one account
