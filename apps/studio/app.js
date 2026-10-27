@@ -1,6 +1,5 @@
 // VoxGarden Studio v0. Plain JS, no build step. All text goes through textContent.
 const $ = (id) => document.getElementById(id);
-const ENGINE = `${location.protocol}//${location.hostname}:8000`; // Icecast
 let stations = [];
 let current = null;
 
@@ -127,7 +126,7 @@ async function select(slug) {
   renderStationHead(s);
   // A recording waiting to be sent goes to whichever station is selected.
   if (!$('rec-review').hidden && !$('rec-send').disabled) $('rec-send').textContent = `Send to ${s.name}`;
-  const url = `${ENGINE}/${s.slug}`;
+  const url = s.listen; // served through the platform, so it works over HTTPS too
   // Share the public station page, not the raw stream: it works in any browser and previews in WhatsApp.
   const page = `${location.origin}/s/${s.slug}`;
   $('st-url').textContent = page;

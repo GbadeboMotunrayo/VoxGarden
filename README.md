@@ -31,7 +31,7 @@ Then try the whole flow:
 
 Stop everything with `Ctrl+C`, then `npm run stop`. Your accounts, stations and audio stay in `data/` and `engine/media/` (both git-ignored), and come back on the next `npm start`.
 
-**Listen from your phone on the same Wi-Fi** (optional): start with `ICECAST_BIND=0.0.0.0 VG_HOST=0.0.0.0 VG_PUBLIC_BASE=http://<your-computer-ip>:4000 VG_STREAM_BASE=http://<your-computer-ip>:8000 npm start`, then open `http://<your-computer-ip>:4000/s/<station>` on the phone. Only do this on a network you trust. Phone *recording* will need HTTPS, which comes later.
+**Test on real phones (listen and record)**: run `npm run phone` instead of `npm start`. It serves VoxGarden over HTTPS on your Wi-Fi (browsers only allow the microphone on secure pages) and prints the address plus one-time steps to install a local testing certificate on each phone. Needs `openssl`. Only use it on a network you trust, and remove the certificate from phones afterwards. Windows/WSL: phones can't reach WSL directly; use WSL mirrored networking.
 
 | Problem | Fix |
 |---|---|

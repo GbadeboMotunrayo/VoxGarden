@@ -1,12 +1,14 @@
 // VoxGarden control platform: accounts, stations and media over a small JSON API.
 // Run: node apps/control/src/server.ts   (Node 24+, no dependencies)
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, get as httpGet, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
+import type { TLSSocket } from 'node:tls';
 import { DatabaseSync } from 'node:sqlite';
 import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { type EngineStation, convertRecording, ensureRunning, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
+import { type EngineStation, convertRecording, ensureRunning, icecastStreamUrl, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
 import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
@@ -19,11 +21,14 @@ const STUDIO_FILES: Record<string, { name: string; type: string }> = {
   '/app.js': { name: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { name: 'style.css', type: 'text/css; charset=utf-8' },
 };
-const SECURE_COOKIE = process.env.VG_SECURE_COOKIE === '1'; // set to 1 behind HTTPS
+const SECURE_COOKIE = process.env.VG_SECURE_COOKIE === '1'; // set to 1 behind an HTTPS proxy
+// Requests that arrived over our own HTTPS listener get Secure cookies automatically.
+const overHttps = (req: IncomingMessage) => SECURE_COOKIE || !!(req.socket as TLSSocket).encrypted;
 const PORT = Number(process.env.PORT ?? 4000);
 // 127.0.0.1 = this computer only. Set VG_HOST=0.0.0.0 to open the Studio to your Wi-Fi.
 const HOST = process.env.VG_HOST ?? '127.0.0.1';
 // Public address of this platform, used in share links and link previews.
+const CERT_DIR = resolve(import.meta.dirname, '../../../data/certs');
 const PUBLIC_BASE = (process.env.VG_PUBLIC_BASE ?? `http://localhost:${PORT}`).replace(/\/$/, '');
 
 // Public station page (FR-10): no login. Fixed file list, like the Studio.
@@ -243,12 +248,39 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 const isWrite = (m?: string) => m === 'POST' || m === 'PUT' || m === 'PATCH' || m === 'DELETE';
 const hasCsrfHeader = (req: IncomingMessage) => req.headers['x-vg-request'] === '1';
 
-const server = createServer(async (req, res) => {
+async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url ?? '/', 'http://x');
     const parts = url.pathname.split('/').filter(Boolean);
 
     if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true });
+
+    // GET /stream/:slug  relays a station's live stream from Icecast, so listeners use
+    // the same address (and HTTPS) as the page. One upstream connection per listener,
+    // so Icecast's listener counts (and usage metering) stay right.
+    if (req.method === 'GET' && parts[0] === 'stream' && parts.length === 2 && SLUG.test(parts[1])) {
+      const upstream = httpGet(icecastStreamUrl(parts[1]), (up) => {
+        if (up.statusCode !== 200) {
+          up.resume();
+          return send(res, 404, { error: 'This station is not on air' });
+        }
+        res.writeHead(200, {
+          'content-type': up.headers['content-type'] ?? 'audio/mpeg',
+          'cache-control': 'no-store',
+          'x-content-type-options': 'nosniff',
+        });
+        up.pipe(res);
+      });
+      upstream.on('error', () => { if (!res.headersSent) send(res, 502, { error: 'Stream unavailable' }); else res.destroy(); });
+      res.on('close', () => upstream.destroy()); // listener left: hang up on Icecast too
+      return;
+    }
+
+    // GET /ca.crt  the local certificate authority, for installing on test phones (see README).
+    if (req.method === 'GET' && url.pathname === '/ca.crt' && existsSync(join(CERT_DIR, 'ca.crt'))) {
+      res.writeHead(200, { 'content-type': 'application/x-x509-ca-cert', 'content-disposition': 'attachment; filename="voxgarden-local-ca.crt"' });
+      return res.end(readFileSync(join(CERT_DIR, 'ca.crt')));
+    }
 
     // Studio UI (static, fixed file list so no path traversal is possible)
     if (req.method === 'GET') {
@@ -330,7 +362,7 @@ const server = createServer(async (req, res) => {
       const user = createUser(db, email as string, name as string, password as string);
       if (!user) return send(res, 409, { error: 'An account with this email already exists. Try logging in.' });
       const token = startSession(db, user.id);
-      return send(res, 201, { user }, { 'set-cookie': sessionCookie(token, SECURE_COOKIE) });
+      return send(res, 201, { user }, { 'set-cookie': sessionCookie(token, overHttps(req)) });
     }
 
     if (req.method === 'POST' && url.pathname === '/auth/login') {
@@ -344,7 +376,7 @@ const server = createServer(async (req, res) => {
       }
       clearFailures(key);
       const token = startSession(db, user.id);
-      return send(res, 200, { user }, { 'set-cookie': sessionCookie(token, SECURE_COOKIE) });
+      return send(res, 200, { user }, { 'set-cookie': sessionCookie(token, overHttps(req)) });
     }
 
     if (req.method === 'POST' && url.pathname === '/auth/logout') {
@@ -562,7 +594,8 @@ const server = createServer(async (req, res) => {
     send(res, status, { error: status === 500 ? 'server error' : (e as Error).message });
     if (status === 500) console.error(e);
   }
-});
+}
+
 
 // ---- scheduler: hands due items to the station's engine ----
 // Items more than a minute late (e.g. the platform was down) are marked missed
@@ -607,4 +640,18 @@ startListenerSampler(db, mountStatus, Number(process.env.VG_USAGE_SAMPLE_MS ?? 3
 // Boot: start every station that has audio, remove processes for deleted stations.
 reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))
   .catch((e) => console.warn('engine reconcile failed:', (e as Error).message));
-server.listen(PORT, HOST, () => console.log(`VoxGarden is running: open http://localhost:${PORT}`));
+createServer(handler).listen(PORT, HOST, () => console.log(`VoxGarden is running: open http://localhost:${PORT}`));
+
+// HTTPS for testing on phones (npm run phone): browsers only allow the microphone on secure pages.
+const HTTPS_PORT = Number(process.env.VG_HTTPS_PORT ?? 0);
+if (HTTPS_PORT) {
+  const key = join(CERT_DIR, 'server.key');
+  const cert = join(CERT_DIR, 'server.crt');
+  if (!existsSync(key) || !existsSync(cert)) {
+    console.warn('VG_HTTPS_PORT is set but data/certs has no certificate. Run: npm run phone');
+  } else {
+    // Phone mode opens only this HTTPS port to the Wi-Fi; plain HTTP stays on this computer.
+    createHttpsServer({ key: readFileSync(key), cert: readFileSync(cert) }, handler)
+      .listen(HTTPS_PORT, process.env.VG_HTTPS_HOST ?? HOST, () => console.log(`HTTPS on port ${HTTPS_PORT}: open ${PUBLIC_BASE}`));
+  }
+}

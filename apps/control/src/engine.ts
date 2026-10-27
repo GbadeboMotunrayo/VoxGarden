@@ -241,15 +241,21 @@ export function removeTrack(slug: string, filename: string): void {
 }
 
 // Where listeners reach Icecast. In production this is the public stream host.
-const STREAM_BASE = (process.env.VG_STREAM_BASE ?? 'http://localhost:8000').replace(/\/$/, '');
+// Unset (the default): listeners get the stream through the control platform at
+// /stream/<station>, on the same address as the page, so it also works over HTTPS.
+// Set it when a separate stream host (CDN, nginx in front of Icecast) serves listeners.
+const STREAM_BASE = (process.env.VG_STREAM_BASE ?? '').replace(/\/$/, '');
 // Where the control platform reaches Icecast itself (status, listener counts).
 const ICECAST_INTERNAL = process.env.VG_ICECAST_INTERNAL ?? 'http://127.0.0.1:8000';
 
 export function listenUrl(slug: string): string {
-  return `${STREAM_BASE}/${slug}`;
+  return STREAM_BASE ? `${STREAM_BASE}/${slug}` : `/stream/${slug}`;
 }
 
-export const streamOrigin = () => new URL(STREAM_BASE).origin;
+// Where the platform fetches a station's stream from when relaying it to a listener.
+export const icecastStreamUrl = (slug: string) => `${ICECAST_INTERNAL}/${slug}`;
+
+export const streamOrigin = () => (STREAM_BASE ? new URL(STREAM_BASE).origin : "'self'");
 
 // Which mounts are live and how many listeners each has, from Icecast's status
 // page. Cached briefly so a busy public page doesn't hammer Icecast.
