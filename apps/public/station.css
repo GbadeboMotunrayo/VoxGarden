@@ -1,7 +1,7 @@
 /* Same palette as the studio: newsprint paper, bottle green, marigold, vermilion for on-air. */
 :root {
   --bg: #f2ede2; --surface: #fbf8f2; --ink: #1e1b16; --muted: #6e6556; --line: #dcd3c2;
-  --green: #1f4b37; --green-soft: #e3e7d3; --on-green: #fbf8f2; --live: #d23a22; --accent: #b55d14;
+  --green: #1f4b37; --green-soft: #e3e7d3; --on-green: #fbf8f2; --live: #d23a22; --accent: #9a4d0f;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #17150f; --surface: #211e17; --ink: #eee7d8; --muted: #a79d89; --line: #38332a;
@@ -49,7 +49,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .foot a { color: var(--green); }
 
 /* Editorial finish, matching the Studio: book serif for the name, squarer shapes, label-style tags. */
-:root { --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif; }
+:root { --display: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif; }
 h1 { font-family: var(--display); font-weight: 600; }
 .card { border-radius: 8px; }
 .logo { border-radius: 4px; }

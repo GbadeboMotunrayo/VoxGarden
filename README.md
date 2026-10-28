@@ -16,12 +16,12 @@ You need **Node.js 24+** ([nodejs.org](https://nodejs.org)) and **Docker** (Dock
 git clone https://github.com/GbadeboMotunrayo/VoxGarden.git
 cd VoxGarden
 npm run setup     # first time only: checks tools, makes passwords, downloads the engine (~1 GB)
-npm start         # then open http://localhost:4000
+npm start         # then open http://localhost:4000 (landing page); the Studio is at /studio
 ```
 
 Then try the whole flow:
 
-1. **Create an account**, then **Plant your first station** (4 short steps).
+1. On the landing page, click **Start your station**, then **create an account**, then **Plant your first station** (4 short steps).
 2. **Upload an audio file** to the Library. The station starts broadcasting within a few seconds.
 3. Click **Public page ↗**: that's what listeners see. Press play.
 4. In **Record a programme**, record a few seconds (allow the microphone), drag Start/End to trim, add a title and **Send**.
@@ -53,6 +53,7 @@ Nothing here is public: by default everything listens on your computer only.
 | [docs/PRD.md](docs/PRD.md) | Product requirements and MVP definition (draft v1.0). |
 | [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md) | Review of the PRD, proposed MVP-0 scope, and what is built vs required. |
 | [docs/ENGINE-SPIKE.md](docs/ENGINE-SPIKE.md) | Engine test results: our own engine vs AzuraCast. |
+| [docs/DESIGN.md](docs/DESIGN.md) | The look: colours, type, shapes, writing rules and the pre-delivery checklist. |
 | [docs/USAGE.md](docs/USAGE.md) | What usage we measure, how accurately, and how to turn it into prices. |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How the three of us (and later others) work in this repo. |
 

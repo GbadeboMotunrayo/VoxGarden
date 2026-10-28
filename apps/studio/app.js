@@ -427,7 +427,7 @@ $('copy').onclick = async () => {
 };
 
 // Boot: signed in already? Go straight to the stations.
-api('/auth/me').then(({ user }) => showApp(user)).catch(() => { setMode('signup'); showAuth(); });
+api('/auth/me').then(({ user }) => showApp(user)).catch(() => { setMode(location.hash === '#login' ? 'login' : 'signup'); showAuth(); });
 
 // ---- record a programme (FR-04) ----
 // Records with the device microphone, lets the user trim the start and end, and

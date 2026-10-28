@@ -1,7 +1,7 @@
 /* Newsprint paper, bottle green, marigold; vermilion is kept for recording and on-air only. */
 :root {
   --bg: #f2ede2; --surface: #fbf8f2; --ink: #1e1b16; --muted: #6e6556; --line: #dcd3c2;
-  --green: #1f4b37; --green-soft: #e3e7d3; --on-green: #fbf8f2; --accent: #b55d14; --danger: #a8321d; --rec: #d23a22;
+  --green: #1f4b37; --green-soft: #e3e7d3; --on-green: #fbf8f2; --accent: #9a4d0f; --danger: #a8321d; --rec: #d23a22;
   --radius: 12px;
 }
 @media (prefers-color-scheme: dark) {
@@ -194,7 +194,7 @@ h4.sub { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; col
 
 /* Editorial finish: a book serif for headings and figures, squarer corners, and
    small-caps labels instead of soft pills. Serif fonts are system ones (no download). */
-:root { --radius: 6px; --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif; }
+:root { --radius: 6px; --display: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif; }
 h1, .wz-title, .brand, .stats strong, .rec-time { font-family: var(--display); }
 h1 { font-weight: 600; letter-spacing: 0; }
 .brand { font-size: 1.12rem; }
@@ -207,7 +207,7 @@ dialog { border-radius: 8px; }
 .logo { border-radius: 4px; }
 .chips span, .status, .badge { border-radius: 3px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
 .badge { background: transparent; border: 1px solid currentColor; }
-.badge:not(.off) { color: var(--rec); }
+.badge:not(.off) { color: var(--danger); }
 .station-list button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--green); }
 /* Phones: logo and name share the first row; the badge and buttons get their own row below. */
 @media (max-width: 560px) {
@@ -215,3 +215,5 @@ dialog { border-radius: 8px; }
   .station-head .grow { flex: 1 1 calc(100% - 90px); }
   .head-actions { order: 3; width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
 }
+
+a.brand { color: inherit; text-decoration: none; }

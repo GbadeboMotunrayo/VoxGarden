@@ -47,4 +47,4 @@ fi
 
 echo
 echo "Setup done. Start VoxGarden with:  npm start"
-echo "Then open http://localhost:4000"
+echo "Then open http://localhost:4000 (the Studio is at /studio)"
