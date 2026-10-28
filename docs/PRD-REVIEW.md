@@ -90,7 +90,7 @@ These need numbers before engineering can test against them:
 | FR-06 Upload/organise | Partial | Upload and remove work. No organising, no validation of file contents. |
 | FR-07 Create → Studio | **Built** (27 Oct) | A recording lands in the station library under its title, ready to schedule. No local drafts yet: an unsent recording is lost if the page closes (the page warns first). |
 | FR-08 Scheduling | **Built** (27 Oct) | Pick a library track and a time; it starts on time (12-293 ms after the slot in tests), cuts off any earlier scheduled item, then AutoDJ resumes. Cancel, missed (>60 s late) and failed states. Single plays only: no recurring shows or playlists-in-a-slot yet. |
-| FR-09 Live | Not built | |
+| FR-09 Live | **Built** (28 Oct) | Go Live panel in the Studio: mic choice, level meter, ON AIR timer, End broadcast. Audio goes browser → WebSocket relay → station engine; the platform issues a one-minute pass per connection (retired ~10 s after use), so engine secrets never reach the browser. Reconnects up to 5 times on drops. Tested with a generated tone in desktop Chromium, not a real mic or phone. |
 | FR-10 Public player | **Built** (27 Oct) | `/s/<station>`: no login, logo, details, live/off-air status, listener count, play/pause that stops data use when paused, auto-reconnect, lock-screen controls, data-use note, WhatsApp/share/copy, link previews (title, description, logo). |
 | FR-11 Discovery | Not built | |
 | FR-12 Health | Not built | |

@@ -8,7 +8,9 @@ import { writeFileSync, mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { type EngineStation, convertRecording, ensureRunning, icecastStreamUrl, importTrack, listenUrl, mediaDir, mountStatus, playNow, reconcile, removeTrack, streamOrigin } from './engine.ts';
+import net from 'node:net';
+import type { Duplex } from 'node:stream';
+import { type EngineStation, convertRecording, ensureRunning, icecastStreamUrl, importTrack, listenUrl, livePort, mediaDir, mountStatus, playNow, presenterLive, reconcile, removeTrack, setLivePass, streamOrigin } from './engine.ts';
 import {
   type User, migrate, validateSignup, createUser, verifyLogin, startSession, endSession, readToken,
   sessionCookie, clearCookie, currentUser, tooManyAttempts, recordFailure, clearFailures,
@@ -255,6 +257,59 @@ async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> 
 const isWrite = (m?: string) => m === 'POST' || m === 'PUT' || m === 'PATCH' || m === 'DELETE';
 const hasCsrfHeader = (req: IncomingMessage) => req.headers['x-vg-request'] === '1';
 
+// ---- Go Live (FR-09) ----
+// A pass is valid for one minute, and is retired a few seconds after a presenter
+// connects, so a leaked pass can't be used to take over the station later.
+const LIVE_PASS_TTL_MS = 60_000;
+const passTimers = new Map<number, NodeJS.Timeout>();
+function retireLivePass(stationId: number, afterMs: number) {
+  clearTimeout(passTimers.get(stationId));
+  passTimers.set(stationId, setTimeout(() => {
+    passTimers.delete(stationId);
+    setLivePass(stationId, randomBytes(24).toString('base64url')).catch(() => {});
+  }, afterMs));
+}
+
+// "Is a presenter live?" for public pages, cached briefly to spare the engine.
+const presenterCache = new Map<string, { at: number; live: boolean }>();
+async function isPresenterLive(slug: string): Promise<boolean> {
+  const hit = presenterCache.get(slug);
+  if (hit && Date.now() - hit.at < 5_000) return hit.live;
+  const row = db.prepare('SELECT id FROM stations WHERE slug = ?').get(slug) as { id: number } | undefined;
+  const live = row ? await presenterLive(row.id) : false;
+  presenterCache.set(slug, { at: Date.now(), live });
+  return live;
+}
+
+// WebSocket relay: browser  ⇄  /live/:slug  ⇄  the station engine's live input.
+// Only a signed-in member of the station, on a page from this same site, gets through.
+function onUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+  const refuse = (code: string) => { socket.end(`HTTP/1.1 ${code}\r\nConnection: close\r\n\r\n`); };
+  const m = /^\/live\/([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(new URL(req.url ?? '/', 'http://x').pathname);
+  if (!m) return refuse('404 Not Found');
+  // Browsers always send Origin on WebSockets: reject other sites driving a logged-in user's browser.
+  const origin = req.headers.origin;
+  if (!origin || new URL(origin).host !== req.headers.host) return refuse('403 Forbidden');
+  const user = currentUser(db, req);
+  const st = user && stationFor(user, m[1]);
+  if (!st) return refuse('403 Forbidden');
+
+  const upstream = net.connect(livePort(st.id), '127.0.0.1', () => {
+    const headers = Object.entries(req.headers)
+      .filter(([k]) => !['cookie', 'host', 'origin'].includes(k))
+      .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`);
+    upstream.write(`GET /live HTTP/1.1\r\nHost: 127.0.0.1\r\n${headers.join('\r\n')}\r\n\r\n`);
+    if (head.length) upstream.write(head);
+    socket.pipe(upstream).pipe(socket);
+    retireLivePass(st.id, 10_000); // the presenter is in: retire the pass shortly
+  });
+  const close = () => { socket.destroy(); upstream.destroy(); };
+  upstream.on('error', close);
+  socket.on('error', close);
+  socket.on('close', () => upstream.destroy());
+  upstream.on('close', () => socket.destroy());
+}
+
 async function handler(req: IncomingMessage, res: ServerResponse) {
   try {
     const url = new URL(req.url ?? '/', 'http://x');
@@ -344,7 +399,8 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
       const st = publicStation(parts[2]);
       if (!st) return send(res, 404, { error: 'No such station' });
       const mounts = await mountStatus();
-      return send(res, 200, { ...st, on_air: mounts.has(st.slug), listeners: mounts.get(st.slug) ?? 0 }, { 'cache-control': 'no-store' });
+      const onAir = mounts.has(st.slug);
+      return send(res, 200, { ...st, on_air: onAir, presenter_live: onAir && (await isPresenterLive(st.slug)), listeners: mounts.get(st.slug) ?? 0 }, { 'cache-control': 'no-store' });
     }
 
     // GET /s/:slug  the shareable station page
@@ -485,6 +541,31 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
       // The stream carries the station name, so restart this station's process only.
       if (input.name !== undefined && hasMedia(st.id)) await ensureRunning(engineStation(st.id));
       return send(res, 200, presentStation({ ...getStation(st.id), role: st.role }));
+    }
+
+    // POST /stations/:slug/live-pass  (any member) Go Live, step 1: start the station's
+    // engine if needed and issue a one-time pass. The browser then connects to
+    // /live/:slug (WebSocket) and presents the pass; the engine's own secrets never leave the server.
+    if (req.method === 'POST' && parts[0] === 'stations' && parts[2] === 'live-pass' && parts.length === 3) {
+      const st = stationFor(user, parts[1]);
+      if (!st) return send(res, 404, { error: 'No such station' });
+      await ensureRunning(engineStation(st.id));
+      const pass = randomBytes(24).toString('base64url');
+      // A just-started engine takes a few seconds before it answers.
+      let lastError = '';
+      for (let i = 0; i < 20; i++) {
+        try {
+          await setLivePass(st.id, pass);
+          lastError = '';
+          break;
+        } catch (e) {
+          lastError = (e as Error).message;
+          await new Promise((r) => setTimeout(r, 750));
+        }
+      }
+      if (lastError) return send(res, 503, { error: 'The station is still starting. Try again in a few seconds.' });
+      retireLivePass(st.id, LIVE_PASS_TTL_MS);
+      return send(res, 200, { ws: `/live/${st.slug}`, pass, expires_in: LIVE_PASS_TTL_MS / 1000 });
     }
 
     // POST /stations/:slug/logo  (raw PNG/JPEG/WebP body, owners only)
@@ -668,7 +749,7 @@ startListenerSampler(db, mountStatus, Number(process.env.VG_USAGE_SAMPLE_MS ?? 3
 // Boot: start every station that has audio, remove processes for deleted stations.
 reconcile(stationsOnAir(), (db.prepare('SELECT slug FROM stations').all() as { slug: string }[]).map((r) => r.slug))
   .catch((e) => console.warn('engine reconcile failed:', (e as Error).message));
-createServer(handler).listen(PORT, HOST, () => console.log(`VoxGarden is running: open http://localhost:${PORT}`));
+createServer(handler).on('upgrade', onUpgrade).listen(PORT, HOST, () => console.log(`VoxGarden is running: open http://localhost:${PORT}`));
 
 // HTTPS for testing on phones (npm run phone): browsers only allow the microphone on secure pages.
 const HTTPS_PORT = Number(process.env.VG_HTTPS_PORT ?? 0);
@@ -679,7 +760,7 @@ if (HTTPS_PORT) {
     console.warn('VG_HTTPS_PORT is set but data/certs has no certificate. Run: npm run phone');
   } else {
     // Phone mode opens only this HTTPS port to the Wi-Fi; plain HTTP stays on this computer.
-    createHttpsServer({ key: readFileSync(key), cert: readFileSync(cert) }, handler)
+    createHttpsServer({ key: readFileSync(key), cert: readFileSync(cert) }, handler).on('upgrade', onUpgrade)
       .listen(HTTPS_PORT, process.env.VG_HTTPS_HOST ?? HOST, () => console.log(`HTTPS on port ${HTTPS_PORT}: open ${PUBLIC_BASE}`));
   }
 }

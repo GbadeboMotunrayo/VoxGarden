@@ -144,8 +144,10 @@ async function loadTracks() {
   const tracks = await api(`/stations/${current}/media`);
   $('count').textContent = tracks.length ? `(${tracks.length})` : '';
   $('no-tracks').hidden = tracks.length > 0;
-  $('st-badge').textContent = tracks.length ? 'On air' : 'Waiting for audio';
-  $('st-badge').classList.toggle('off', !tracks.length);
+  // Live presenters count as on air even before the station has a playlist.
+  const presenting = gl.want && gl.slug === current;
+  $('st-badge').textContent = presenting ? 'Live' : tracks.length ? 'On air' : 'Waiting for audio';
+  $('st-badge').classList.toggle('off', !tracks.length && !presenting);
   $('tracks').replaceChildren(...tracks.map((t) => {
     const del = el('button', { className: 'btn small danger', type: 'button' }, 'Remove');
     del.onclick = async () => {
@@ -756,3 +758,172 @@ $('admin-close').onclick = () => {
   $('admin').hidden = true;
   if (current) select(current); else $('empty').hidden = stations.length > 0;
 };
+
+// ---- go live (FR-09) ----
+// Browser mic → MediaRecorder (Opus) → WebSocket /live/<station> → the station's
+// engine. The platform hands out a one-minute pass per connection; the engine's
+// secrets never reach the browser. A dropped connection reconnects with a new pass.
+const gl = { stream: null, ctx: null, raf: null, ws: null, rec: null, slug: null, name: '', started: 0,
+  timer: null, want: false, retries: 0, confirmed: false };
+const GL_MAX_RETRIES = 5;
+const glMsg = (m) => { $('gl-msg').textContent = m || ''; $('gl-msg').hidden = !m; };
+const glWarn = (e) => { e.preventDefault(); e.returnValue = ''; };
+
+function glMeter() {
+  const analyser = gl.ctx.createAnalyser();
+  analyser.fftSize = 512;
+  gl.ctx.createMediaStreamSource(gl.stream).connect(analyser);
+  const data = new Uint8Array(analyser.fftSize);
+  const draw = () => {
+    analyser.getByteTimeDomainData(data);
+    let peak = 0;
+    for (const v of data) peak = Math.max(peak, Math.abs(v - 128));
+    const w = `${Math.min(100, (peak / 128) * 140)}%`;
+    $('gl-level').style.width = w;
+    $('gl-level-on').style.width = w;
+    gl.raf = requestAnimationFrame(draw);
+  };
+  draw();
+}
+
+async function glListMics() {
+  const devices = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  const sel = $('gl-mic');
+  const keep = sel.value;
+  sel.replaceChildren(el('option', { value: '', textContent: 'Default microphone' }),
+    ...devices.filter((d) => d.deviceId && d.deviceId !== 'default')
+      .map((d, i) => el('option', { value: d.deviceId, textContent: d.label || `Microphone ${i + 1}` })));
+  sel.value = keep;
+}
+
+async function glOpenMic() {
+  const id = $('gl-mic').value;
+  gl.stream = await navigator.mediaDevices.getUserMedia({
+    audio: { deviceId: id ? { exact: id } : undefined, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+  });
+  gl.ctx = new AudioContext();
+  glMeter();
+  glListMics().catch(() => {});
+}
+
+function glReleaseMic() {
+  cancelAnimationFrame(gl.raf);
+  gl.stream?.getTracks().forEach((t) => t.stop());
+  gl.ctx?.close();
+  gl.stream = null;
+  gl.ctx = null;
+  $('gl-level').style.width = '0';
+}
+
+// One connection: get a pass, open the socket, introduce ourselves, stream audio.
+async function glConnect() {
+  const { ws: path, pass } = await api(`/stations/${gl.slug}/live-pass`, { method: 'POST' });
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${path}`, 'webcast');
+  ws.binaryType = 'arraybuffer';
+  gl.ws = ws;
+  await new Promise((ok, fail) => { ws.onopen = ok; ws.onerror = () => fail(new Error('Could not reach your station')); });
+  const mime = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].find((m) => MediaRecorder.isTypeSupported(m));
+  if (!mime) throw new Error('This browser cannot broadcast. Try Chrome, Edge or Firefox.');
+  ws.send(JSON.stringify({ type: 'hello', data: { mime, user: 'source', password: pass, audio: { channels: 1, samplerate: gl.ctx.sampleRate } } }));
+  // A new recorder per connection: the engine needs the stream's header at the start.
+  const rec = new MediaRecorder(gl.stream, { mimeType: mime, audioBitsPerSecond: 96000 });
+  rec.ondataavailable = async (e) => { if (e.data.size && ws.readyState === WebSocket.OPEN) ws.send(await e.data.arrayBuffer()); };
+  rec.start(250);
+  gl.rec = rec;
+  ws.onclose = () => { rec.state !== 'inactive' && rec.stop(); if (gl.want && gl.ws === ws) glReconnect(); };
+  glConfirm(ws);
+}
+
+// Only show "you're live" once the station itself reports the presenter on air.
+async function glConfirm(ws) {
+  for (let i = 0; i < 16 && gl.want && gl.ws === ws; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const s = await fetch(`/public/stations/${gl.slug}`, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+    if (s?.presenter_live) {
+      gl.confirmed = true;
+      gl.retries = 0;
+      $('gl-state').textContent = `You're live on ${gl.name}. Listeners on your station page hear you now.`;
+      glMsg('');
+      return;
+    }
+  }
+  if (gl.want && gl.ws === ws && ws.readyState === WebSocket.OPEN) $('gl-state').textContent = 'Connected. Waiting for the station to switch to you…';
+}
+
+async function glReconnect() {
+  if (!gl.want) return;
+  if (gl.retries >= GL_MAX_RETRIES) {
+    glStop();
+    return glMsg('The broadcast ended: we lost the connection. Check your internet and press Go live again.');
+  }
+  gl.retries++;
+  const wait = Math.min(15, 2 ** (gl.retries - 1));
+  $('gl-state').textContent = `Connection lost. Reconnecting in ${wait} s (try ${gl.retries} of ${GL_MAX_RETRIES})…`;
+  await new Promise((r) => setTimeout(r, wait * 1000));
+  if (!gl.want) return;
+  try { await glConnect(); } catch { glReconnect(); }
+}
+
+function glTick() {
+  const s = Math.floor((Date.now() - gl.started) / 1000);
+  $('gl-clock').textContent = `${Math.floor(s / 3600) ? `${Math.floor(s / 3600)}:` : ''}${String(Math.floor(s / 60) % 60).padStart(Math.floor(s / 3600) ? 2 : 1, '0')}:${String(s % 60).padStart(2, '0')}`;
+}
+
+function glView(live) {
+  $('gl-idle').hidden = live;
+  $('gl-on').hidden = !live;
+  $('live-card').classList.toggle('is-live', live);
+  if (current) loadTracks().catch(() => {}); // refresh the header badge
+}
+
+$('gl-start').onclick = async () => {
+  glMsg('');
+  if (!window.isSecureContext) return glMsg('Going live needs a secure page (https:// or localhost).');
+  const st = stations.find((x) => x.slug === current);
+  if (!st) return;
+  Object.assign(gl, { slug: st.slug, name: st.name, want: true, retries: 0, confirmed: false });
+  $('gl-start').disabled = true;
+  $('gl-start').textContent = 'Connecting…';
+  try {
+    await glOpenMic();
+  } catch (e) {
+    gl.want = false;
+    $('gl-start').disabled = false;
+    $('gl-start').textContent = 'Go live';
+    return glMsg(e.name === 'NotAllowedError'
+      ? 'Microphone access was blocked. Allow it from the icon next to the address bar, then try again.'
+      : 'No microphone was found on this device.');
+  }
+  $('gl-state').textContent = 'Connecting to your station…';
+  gl.started = Date.now();
+  glTick();
+  gl.timer = setInterval(glTick, 1000);
+  glView(true);
+  window.addEventListener('beforeunload', glWarn);
+  try {
+    await glConnect();
+  } catch (e) {
+    glStop();
+    glMsg(e.message);
+  }
+};
+
+function glStop() {
+  gl.want = false;
+  clearInterval(gl.timer);
+  gl.rec?.state !== 'inactive' && gl.rec?.stop();
+  gl.ws?.close();
+  gl.ws = null;
+  glReleaseMic();
+  window.removeEventListener('beforeunload', glWarn);
+  glView(false);
+  $('gl-start').disabled = false;
+  $('gl-start').textContent = 'Go live';
+}
+
+$('gl-end').onclick = () => {
+  if (confirm('End the broadcast? Your station will go back to its playlist.')) glStop();
+};
+
+// Logging out ends a broadcast cleanly rather than leaving the mic streaming.
+$('logout').addEventListener('click', () => { if (gl.want) glStop(); });

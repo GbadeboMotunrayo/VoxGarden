@@ -62,11 +62,15 @@ settings.server.telnet.bind_addr := "0.0.0.0"
 settings.harbor.bind_addrs := ["0.0.0.0"]
 
 pw = environment.get("ICECAST_SOURCE_PASSWORD")
-live_pw = environment.get("HARBOR_PASSWORD")
+# Live presenters authenticate with a short-lived pass the control platform sets
+# over telnet (var.set live_pass = "...") when they press Go Live. It starts as a
+# random secret and is rotated again after each use, so it is never reusable.
+live_pass = interactive.string("live_pass", environment.get("HARBOR_PASSWORD"))
 
 auto = mksafe(playlist(id="auto", mode="randomize", reload_mode="watch", ${q('/media/' + s.slug)}))
 sched = request.queue(id="sched")
-live = input.harbor(id="live", "live", port=8005, password=live_pw, buffer=2., max=10.)
+live = input.harbor(id="live", "live", port=8005, buffer=2., max=10.,
+  auth=fun (login) -> login.password != "" and login.password == live_pass())
 
 radio = fallback(id="radio", track_sensitive=false, [live, sched, auto])
 radio.on_track(fun (m) -> log.important(label="onair", 'ONAIR rid=#{m["rid"]} t=#{time()}'))
@@ -160,6 +164,26 @@ export function command(stationId: number, cmd: string, timeoutMs = 3000): Promi
     sock.on('error', (e) => finish(() => fail(e)));
     sock.write(cmd.replace(/[\r\n]/g, '') + '\n');
   });
+}
+
+// Sets the pass the next live presenter must present. Called with a fresh random
+// value when someone presses Go Live, and again afterwards to retire it.
+export async function setLivePass(stationId: number, pass: string): Promise<void> {
+  if (!/^[A-Za-z0-9_-]{16,}$/.test(pass)) throw new Error('bad pass');
+  // No quotes: Liquidsoap's telnet keeps them as part of the value. The pattern
+  // check above guarantees the pass is only letters, digits, "-" and "_".
+  const reply = await command(stationId, `var.set live_pass = ${pass}`);
+  if (!/^Variable live_pass set/i.test(reply.trim())) throw new Error(`engine refused: ${reply.slice(0, 80)}`);
+}
+
+// Is a presenter connected right now? (Liquidsoap answers "connected ..." or "no source client connected".)
+export async function presenterLive(stationId: number): Promise<boolean> {
+  try {
+    const reply = await command(stationId, 'live.status', 1500);
+    return /^source client connected/i.test(reply.trim());
+  } catch {
+    return false;
+  }
 }
 
 // Puts a library file on air now. It interrupts AutoDJ, and with hardStart it also

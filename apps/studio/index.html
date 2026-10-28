@@ -100,6 +100,25 @@
         <p class="hint">A new track can take a few seconds to join the rotation. If the player is silent, press play again.</p>
       </div>
 
+      <div class="card golive" id="live-card">
+        <h3>Go live</h3>
+        <div id="gl-idle">
+          <label class="field">Microphone
+            <select id="gl-mic"><option value="">Default microphone</option></select>
+          </label>
+          <div class="meter" aria-hidden="true"><div id="gl-level"></div></div>
+          <p class="muted small">Use headphones so your station doesn't echo back into the mic. When you end, your station returns to its playlist.</p>
+          <button id="gl-start" class="btn live-btn" type="button">Go live</button>
+        </div>
+        <div id="gl-on" hidden>
+          <p class="onair" role="status"><span class="onair-dot" aria-hidden="true"></span><strong>ON AIR</strong> <span id="gl-clock">0:00</span></p>
+          <p id="gl-state" class="muted small">You're live. Listeners on your station page hear you now.</p>
+          <div class="meter" aria-hidden="true"><div id="gl-level-on"></div></div>
+          <button id="gl-end" class="btn danger-solid" type="button">End broadcast</button>
+        </div>
+        <p id="gl-msg" class="err" role="alert" hidden></p>
+      </div>
+
       <div class="card rec" id="rec-card">
         <h3>Record a programme</h3>
         <p id="rec-unsupported" class="muted small" hidden></p>
@@ -153,7 +172,7 @@
         </label>
         <ul id="uploads" class="uploads"></ul>
         <ul id="tracks" class="tracks"></ul>
-        <p id="no-tracks" class="muted" hidden>No tracks yet. Upload one to go on air.</p>
+        <p id="no-tracks" class="muted" hidden>No tracks yet. Upload or record one so your station has something to play between live shows.</p>
       </div>
 
       <div class="card" id="schedule-card">

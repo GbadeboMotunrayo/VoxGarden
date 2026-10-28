@@ -75,7 +75,7 @@ async function refresh() {
     onAir = s.on_air;
     play.disabled = !onAir && !wantPlaying;
     $('listeners').textContent = onAir && s.listeners > 0 ? `${s.listeners} listening now` : '';
-    if (!wantPlaying) setState('idle', onAir ? 'Live now' : 'Off air: this station hasn\'t started broadcasting yet', onAir);
+    if (!wantPlaying) setState('idle', s.presenter_live ? 'Live now: presenter on air' : onAir ? 'Live now' : 'Off air: this station hasn\'t started broadcasting yet', onAir);
   } catch {
     // Offline: keep showing the last known state.
   }
