@@ -1,12 +1,12 @@
+/* Newsprint paper, bottle green, marigold; vermilion is kept for recording and on-air only. */
 :root {
-  --bg: #f6f8f4; --surface: #ffffff; --ink: #17261d; --muted: #5d6f63; --line: #dbe4dc;
-  --green: #166534; --green-soft: #dcfce7; --accent: #ca8a04; --danger: #b91c1c;
+  --bg: #f2ede2; --surface: #fbf8f2; --ink: #1e1b16; --muted: #6e6556; --line: #dcd3c2;
+  --green: #1f4b37; --green-soft: #e3e7d3; --on-green: #fbf8f2; --accent: #b55d14; --danger: #a8321d; --rec: #d23a22;
   --radius: 12px;
 }
-:root:not([data-theme="light"]) { }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #0f1a13; --surface: #16251b; --ink: #e8f1ea; --muted: #9db3a3; --line: #28402f;
-          --green: #4ade80; --green-soft: #14532d; --accent: #facc15; --danger: #f87171; }
+  :root { --bg: #17150f; --surface: #211e17; --ink: #eee7d8; --muted: #a79d89; --line: #38332a;
+          --green: #9dc49a; --green-soft: #2a3424; --on-green: #13210f; --accent: #eda349; --danger: #ec7a62; --rec: #f0634b; }
 }
 * { box-sizing: border-box; }
 /* Components set their own display, which would otherwise beat the hidden attribute. */
@@ -23,7 +23,7 @@ h3 { font-size: 1rem; margin-bottom: 10px; }
   padding: 12px 20px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
 .brand b { color: var(--green); }
-.mark { width: 22px; height: 22px; border-radius: 50% 50% 50% 4px; background: var(--green); transform: rotate(-45deg); }
+.mark { width: 22px; height: 22px; border-radius: 50% 50% 50% 4px; background: var(--green); box-shadow: inset -6px -6px 0 var(--accent); transform: rotate(-45deg); }
 .conn { font-size: .85rem; color: var(--muted); }
 .conn.ok::before, .conn.bad::before { content: ""; display: inline-block; width: 8px; height: 8px;
   border-radius: 50%; margin-right: 6px; background: var(--green); }
@@ -50,8 +50,7 @@ input:focus-visible, button:focus-visible, .drop:focus-visible { outline: 3px so
 
 .btn { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface);
   color: var(--ink); font: inherit; font-weight: 600; cursor: pointer; }
-.btn.primary { background: var(--green); border-color: var(--green); color: #fff; width: 100%; }
-@media (prefers-color-scheme: dark) { .btn.primary { color: #052e16; } }
+.btn.primary { background: var(--green); border-color: var(--green); color: var(--on-green); width: 100%; }
 a.btn { text-decoration: none; display: inline-block; text-align: center; }
 .btn.small { padding: 4px 10px; font-size: .85rem; font-weight: 500; }
 .btn.danger { color: var(--danger); }
@@ -76,8 +75,8 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 .station-head { align-items: flex-start; }
 .logo { width: 72px; height: 72px; border-radius: 14px; object-fit: cover; flex: none; border: 1px solid var(--line); }
 .logo.big { width: 96px; height: 96px; }
-.logo.ph { background: linear-gradient(135deg, var(--green-soft), var(--surface)); position: relative; }
-.logo.ph::after { content: ""; position: absolute; inset: 30%; border-radius: 50% 50% 50% 4px; background: var(--green); transform: rotate(-45deg); opacity: .5; }
+.logo.ph { background: var(--green-soft); position: relative; }
+.logo.ph::after { content: ""; position: absolute; inset: 30%; border-radius: 50% 50% 50% 4px; background: var(--accent); transform: rotate(-45deg); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .chips span { font-size: .78rem; padding: 2px 8px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
 .desc { margin: 6px 0; max-width: 60ch; overflow-wrap: anywhere; }
@@ -88,7 +87,7 @@ a.btn { text-decoration: none; display: inline-block; text-align: center; }
 /* wizard */
 dialog { border: 1px solid var(--line); border-radius: 16px; padding: 0; width: min(520px, calc(100vw - 32px));
   background: var(--surface); color: var(--ink); }
-dialog::backdrop { background: rgb(0 0 0 / .5); }
+dialog::backdrop { background: rgb(23 21 15 / .6); }
 #wz-form { padding: 22px; }
 .wz-title { font-size: 1.4rem; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 2px 0 10px; }
 .wz-head p { margin: 0; }
@@ -113,10 +112,10 @@ fieldset { border: 0; padding: 0; margin: 0; }
 /* record (FR-04) */
 .rec #rec-idle { text-align: center; }
 .rec-btn { width: 84px; height: 84px; border-radius: 50%; border: 4px solid var(--line); background: var(--surface); cursor: pointer; display: grid; place-items: center; margin: 4px auto 8px; }
-.rec-btn .dot { width: 46px; height: 46px; border-radius: 50%; background: #dc2626; }
-.rec-btn:hover { border-color: #dc2626; }
+.rec-btn .dot { width: 46px; height: 46px; border-radius: 50%; background: var(--rec); }
+.rec-btn:hover { border-color: var(--rec); }
 .rec-time { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; margin: 4px 0; }
-.rec-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: #dc2626; margin-right: 10px; vertical-align: 4px; animation: blink 1s steps(2) infinite; }
+.rec-dot { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--rec); margin-right: 10px; vertical-align: 4px; animation: blink 1s steps(2) infinite; }
 .paused .rec-dot { animation: none; opacity: .3; }
 @keyframes blink { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
@@ -191,4 +190,28 @@ h4.sub { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em; col
 @media (max-width: 560px) {
   .top { padding: 10px 16px; }
   .conn { display: none; }
+}
+
+/* Editorial finish: a book serif for headings and figures, squarer corners, and
+   small-caps labels instead of soft pills. Serif fonts are system ones (no download). */
+:root { --radius: 6px; --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", "URW Palladio L", Georgia, serif; }
+h1, .wz-title, .brand, .stats strong, .rec-time { font-family: var(--display); }
+h1 { font-weight: 600; letter-spacing: 0; }
+.brand { font-size: 1.12rem; }
+.brand b { font-style: italic; font-weight: 600; }
+.stats strong { font-weight: 600; }
+.btn, .station-list button, .card, .stats div, .wave, .table-wrap, .drop,
+#wz-form input:not([type=file]), #wz-form select, #wz-form textarea, .sched-form select, .sched-form input,
+.rec .field input, .auth-card input, .new label input { border-radius: var(--radius); }
+dialog { border-radius: 8px; }
+.logo { border-radius: 4px; }
+.chips span, .status, .badge { border-radius: 3px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; }
+.badge { background: transparent; border: 1px solid currentColor; }
+.badge:not(.off) { color: var(--rec); }
+.station-list button[aria-current="true"] { box-shadow: inset 3px 0 0 var(--green); }
+/* Phones: logo and name share the first row; the badge and buttons get their own row below. */
+@media (max-width: 560px) {
+  .station-head { flex-wrap: wrap; }
+  .station-head .grow { flex: 1 1 calc(100% - 90px); }
+  .head-actions { order: 3; width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-start; }
 }
