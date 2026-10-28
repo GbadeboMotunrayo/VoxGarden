@@ -11,6 +11,7 @@
     "setup": "bash scripts/setup.sh",
     "start": "docker compose -f engine/docker-compose.yml --progress quiet up -d && node apps/control/src/server.ts",
     "stop": "bash scripts/stop.sh",
-    "phone": "bash scripts/phone.sh"
+    "phone": "bash scripts/phone.sh",
+    "demo": "node scripts/demo.mjs"
   }
 }

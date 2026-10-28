@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explore stations · VoxGarden</title>
+<meta name="description" content="Find internet radio stations on VoxGarden by place, language and category, and listen live in your browser.">
+<meta property="og:title" content="Explore stations · VoxGarden">
+<meta property="og:description" content="Independent, campus and community radio. Find a station and press play.">
+<meta name="theme-color" content="#1f4b37">
+<link rel="preload" href="/public/fonts/newsreader-normal-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/public/fonts/fonts.css">
+<link rel="stylesheet" href="/public/landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="/" aria-label="VoxGarden home"><span class="mark" aria-hidden="true"></span>VoxGarden</a>
+    <nav aria-label="Main">
+      <button class="menu-btn" id="menu-btn" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
+      <ul id="menu">
+        <li><a href="/explore" aria-current="page">Explore</a></li>
+        <li><a href="/#how">How it works</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+        <li><a href="/studio#login">Log in</a></li>
+        <li><a class="btn btn-primary btn-sm" href="/studio">Start your station</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main" class="explore">
+  <section class="wrap ex-head">
+    <p class="eyebrow">VoxGarden Globe · early directory</p>
+    <h1 class="ex-title">Find a station. <em>Press play.</em></h1>
+    <form class="ex-search" role="search" id="ex-form">
+      <label class="sr" for="ex-q">Search stations</label>
+      <input id="ex-q" type="search" placeholder="Search by name, topic or place" autocomplete="off">
+    </form>
+    <div class="ex-filters" aria-label="Filters">
+      <label class="chk"><input id="ex-live" type="checkbox"> On air now</label>
+      <label class="sel">Category <select id="ex-cat"><option value="">All</option></select></label>
+      <label class="sel">Language <select id="ex-lang"><option value="">All</option></select></label>
+    </div>
+    <div class="ex-places" id="ex-places" aria-label="Places"></div>
+  </section>
+
+  <section class="wrap">
+    <p class="muted ex-count" id="ex-count" aria-live="polite"></p>
+    <ul class="ex-grid" id="ex-grid"></ul>
+    <div class="ex-empty" id="ex-empty" hidden>
+      <p>No stations match that yet.</p>
+      <p class="muted">Clear a filter, or <a href="/studio">start the first one</a>.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p class="brand"><span class="mark" aria-hidden="true"></span>VoxGarden</p>
+    <p class="muted">Every voice deserves room to grow.</p>
+    <p class="muted"><a href="/">Home</a> · <a href="/studio">Studio</a></p>
+  </div>
+</footer>
+
+<script src="/public/explore.js"></script>
+</body>
+</html>

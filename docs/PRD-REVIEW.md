@@ -92,7 +92,7 @@ These need numbers before engineering can test against them:
 | FR-08 Scheduling | **Built** (27 Oct) | Pick a library track and a time; it starts on time (12-293 ms after the slot in tests), cuts off any earlier scheduled item, then AutoDJ resumes. Cancel, missed (>60 s late) and failed states. Single plays only: no recurring shows or playlists-in-a-slot yet. |
 | FR-09 Live | **Built** (28 Oct) | Go Live panel in the Studio: mic choice, level meter, ON AIR timer, End broadcast. Audio goes browser → WebSocket relay → station engine; the platform issues a one-minute pass per connection (retired ~10 s after use), so engine secrets never reach the browser. Reconnects up to 5 times on drops. Tested with a generated tone in desktop Chromium, not a real mic or phone. |
 | FR-10 Public player | **Built** (27 Oct) | `/s/<station>`: no login, logo, details, live/off-air status, listener count, play/pause that stops data use when paused, auto-reconnect, lock-screen controls, data-use note, WhatsApp/share/copy, link previews (title, description, logo). |
-| FR-11 Discovery | Not built | |
+| FR-11 Discovery | **Partly built** (28 Oct) | `/explore`: every station with audio or live, search (accent-insensitive, any word order), category, language, place and on-air filters, shareable filtered links. Landing page lists stations on air now. Not yet: map/globe view. |
 | FR-12 Health | Not built | |
 | FR-13 Usage metering | **Built** (27 Oct) | Listener-hours, peak listeners, data streamed (estimate), on-air time, uploads, recording minutes and storage, per station per day. Studio usage card; founders-only platform view (`VG_ADMIN_EMAILS`); storage limit per station enforced. See docs/USAGE.md. |
 

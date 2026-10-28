@@ -41,6 +41,7 @@ const PUBLIC_FILES: Record<string, { name: string; type: string }> = {
   '/public/default-logo.svg': { name: 'default-logo.svg', type: 'image/svg+xml' },
   '/public/landing.css': { name: 'landing.css', type: 'text/css; charset=utf-8' },
   '/public/landing.js': { name: 'landing.js', type: 'text/javascript; charset=utf-8' },
+  '/public/explore.js': { name: 'explore.js', type: 'text/javascript; charset=utf-8' },
   '/public/fonts/fonts.css': { name: 'fonts/fonts.css', type: 'text/css; charset=utf-8' },
   '/public/fonts/newsreader-normal-latin.woff2': { name: 'fonts/newsreader-normal-latin.woff2', type: 'font/woff2' },
   '/public/fonts/newsreader-normal-latin-ext.woff2': { name: 'fonts/newsreader-normal-latin-ext.woff2', type: 'font/woff2' },
@@ -347,12 +348,12 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
     // Studio UI (static, fixed file list so no path traversal is possible)
     if (req.method === 'GET') {
       // The landing page is the front door; the Studio lives at /studio.
-      if (url.pathname === '/') {
+      if (url.pathname === '/' || url.pathname === '/explore') {
         res.writeHead(200, {
           'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache',
           'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'",
         });
-        return res.end(readFileSync(join(PUBLIC_DIR, 'landing.html')));
+        return res.end(readFileSync(join(PUBLIC_DIR, url.pathname === '/' ? 'landing.html' : 'explore.html')));
       }
       const file = STUDIO_FILES[url.pathname === '/studio' ? '/index.html' : url.pathname];
       if (file) {
@@ -377,7 +378,7 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
       const file = PUBLIC_FILES[url.pathname];
       if (file) {
         // Fonts never change under the same name, so browsers may keep them for a year.
-        const cache = file.type === 'font/woff2' ? 'public, max-age=31536000, immutable' : 'public, max-age=300';
+        const cache = file.type === 'font/woff2' ? 'public, max-age=31536000, immutable' : 'no-cache'; // no-cache = revalidate, so updates show at once
         res.writeHead(200, { 'content-type': file.type, 'cache-control': cache, 'x-content-type-options': 'nosniff' });
         return res.end(readFileSync(join(PUBLIC_DIR, file.name)));
       }
@@ -392,6 +393,27 @@ async function handler(req: IncomingMessage, res: ServerResponse) {
         .sort((a, b) => b.listeners - a.listeners || a.name.localeCompare(b.name))
         .slice(0, 12);
       return send(res, 200, live, { 'cache-control': 'no-store' });
+    }
+
+    // GET /public/stations  the directory (FR-11): every station that has audio or is
+    // live, with public profile fields only. Filtering happens in the browser.
+    if (req.method === 'GET' && url.pathname === '/public/stations') {
+      const mounts = await mountStatus();
+      const rows = db.prepare(`SELECT ${STATION_FIELDS} FROM stations s
+        WHERE EXISTS (SELECT 1 FROM media m WHERE m.station_id = s.id) ORDER BY s.name LIMIT 1000`).all() as unknown as StationRow[];
+      const slugs = new Set(rows.map((r) => r.slug));
+      // Live-only stations (a presenter, no playlist yet) are listed too.
+      for (const slug of mounts.keys()) {
+        if (!slugs.has(slug)) {
+          const r = db.prepare(`SELECT ${STATION_FIELDS} FROM stations s WHERE s.slug = ?`).get(slug) as unknown as StationRow | undefined;
+          if (r) rows.push(r);
+        }
+      }
+      return send(res, 200, rows.map((r) => {
+        const p = presentStation(r);
+        return { slug: p.slug, name: p.name, description: p.description, category: p.category, language: p.language,
+          city: p.city, country: p.country, logo: p.logo, on_air: mounts.has(r.slug), listeners: mounts.get(r.slug) ?? 0 };
+      }), { 'cache-control': 'no-store' });
     }
 
     // GET /public/stations/:slug  what anyone may know about a station, plus live status

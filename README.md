@@ -6,7 +6,7 @@ VoxGarden lets anyone start an internet radio station from a phone or a laptop, 
 
 Founders: **Ayobami**, **Bamidele**, **Motunrayo**. Principle: *we rise by lifting others.*
 
-> Status: **building MVP-0, testing locally.** **All MVP-0 items are built**: accounts, station wizard, uploads, recording with trim, per-station engine, scheduling, public station page, usage metering. Not yet: Go Live button, HTTPS (needed for recording on phones), password reset. Details in [docs/PRD-REVIEW.md](docs/PRD-REVIEW.md).
+> Status: **building MVP-0, testing locally.** **All MVP-0 items are built, plus Go Live and an early station directory**: accounts, station wizard, uploads, recording with trim, per-station engine, scheduling, public station pages, usage metering, Go Live from the browser, Explore. Not yet: map view, password reset, real-phone testing.
 
 ## Run it on your computer
 
@@ -17,6 +17,7 @@ git clone https://github.com/GbadeboMotunrayo/VoxGarden.git
 cd VoxGarden
 npm run setup     # first time only: checks tools, makes passwords, downloads the engine (~1 GB)
 npm start         # then open http://localhost:4000 (landing page); the Studio is at /studio
+npm run demo      # optional, in a second terminal: adds six labelled demo stations for showing it off
 ```
 
 Then try the whole flow:
@@ -26,6 +27,8 @@ Then try the whole flow:
 3. Click **Public page ↗**: that's what listeners see. Press play.
 4. In **Record a programme**, record a few seconds (allow the microphone), drag Start/End to trim, add a title and **Send**.
 5. In **Schedule**, pick the track and a time a minute or two ahead. Watch it move to *Played on time*.
+6. In **Go live**, press the red button and talk (headphones help). Open your station page on another device: you're on air. Press **End broadcast** to hand back to the playlist.
+7. Visit **/explore** to search and filter every station.
 
 **Founders:** to see every station's usage, start with your emails: `VG_ADMIN_EMAILS=you@example.com npm start`, then use **Platform usage** in the header.
 
